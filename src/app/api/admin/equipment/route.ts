@@ -2,13 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth/config";
 import { db } from "@/db";
 import { equipment } from "@/db/schema";
-import { eq } from "drizzle-orm";
 import { z } from "zod";
 import { randomUUID } from "crypto";
+import { parseI18n, stringifyI18n } from "@/lib/utils/i18n";
+
+const i18nField = z.object({ de: z.string().min(1), en: z.string().min(1) });
+const i18nOptional = z.object({ de: z.string(), en: z.string() }).optional();
 
 const schema = z.object({
-  name: z.string().min(1),
-  description: z.string().optional(),
+  name: i18nField,
+  description: i18nOptional,
   imageUrl: z.string().optional(),
   isActive: z.boolean().optional().default(true),
 });
@@ -21,10 +24,16 @@ async function requireAdmin() {
 }
 
 export async function GET() {
-  const items = await db.query.equipment.findMany({
-    orderBy: (e, { asc }) => [asc(e.name)],
-  });
-  return NextResponse.json(items);
+  const items = await db.query.equipment.findMany();
+  return NextResponse.json(
+    items
+      .map((e) => ({
+        ...e,
+        name: parseI18n(e.nameI18n),
+        description: parseI18n(e.descriptionI18n),
+      }))
+      .sort((a, b) => a.name.de.localeCompare(b.name.de, "de"))
+  );
 }
 
 export async function POST(req: NextRequest) {
@@ -36,10 +45,19 @@ export async function POST(req: NextRequest) {
   if (!parsed.success)
     return NextResponse.json({ error: "Invalid input" }, { status: 400 });
 
+  const { name, description, ...rest } = parsed.data;
   const item = await db
     .insert(equipment)
-    .values({ id: randomUUID(), ...parsed.data })
+    .values({
+      id: randomUUID(),
+      nameI18n: stringifyI18n(name),
+      descriptionI18n: description ? stringifyI18n(description) : null,
+      ...rest,
+    })
     .returning();
 
-  return NextResponse.json(item[0], { status: 201 });
+  return NextResponse.json(
+    { ...item[0], name: parseI18n(item[0].nameI18n), description: parseI18n(item[0].descriptionI18n) },
+    { status: 201 }
+  );
 }

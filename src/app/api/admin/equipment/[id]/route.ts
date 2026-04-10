@@ -4,10 +4,14 @@ import { db } from "@/db";
 import { equipment } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { z } from "zod";
+import { parseI18n, stringifyI18n } from "@/lib/utils/i18n";
+
+const i18nField = z.object({ de: z.string().min(1), en: z.string().min(1) }).optional();
+const i18nOptional = z.object({ de: z.string(), en: z.string() }).optional();
 
 const schema = z.object({
-  name: z.string().min(1).optional(),
-  description: z.string().optional(),
+  name: i18nField,
+  description: i18nOptional,
   imageUrl: z.string().optional(),
   isActive: z.boolean().optional(),
 });
@@ -32,16 +36,28 @@ export async function PATCH(
   if (!parsed.success)
     return NextResponse.json({ error: "Invalid input" }, { status: 400 });
 
+  const { name, description, ...rest } = parsed.data;
   const updated = await db
     .update(equipment)
-    .set({ ...parsed.data, updatedAt: new Date().toISOString() })
+    .set({
+      ...rest,
+      ...(name && { nameI18n: stringifyI18n(name) }),
+      ...(description !== undefined && {
+        descriptionI18n: description ? stringifyI18n(description) : null,
+      }),
+      updatedAt: new Date().toISOString(),
+    })
     .where(eq(equipment.id, id))
     .returning();
 
   if (!updated.length)
     return NextResponse.json({ error: "Not found" }, { status: 404 });
 
-  return NextResponse.json(updated[0]);
+  return NextResponse.json({
+    ...updated[0],
+    name: parseI18n(updated[0].nameI18n),
+    description: parseI18n(updated[0].descriptionI18n),
+  });
 }
 
 export async function DELETE(

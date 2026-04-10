@@ -63,8 +63,8 @@ CREATE TABLE `chat_messages` (
 --> statement-breakpoint
 CREATE TABLE `equipment` (
 	`id` text PRIMARY KEY NOT NULL,
-	`name` text NOT NULL,
-	`description` text,
+	`name_i18n` text NOT NULL,
+	`description_i18n` text,
 	`image_url` text,
 	`is_active` integer DEFAULT true NOT NULL,
 	`created_at` text NOT NULL,
@@ -73,8 +73,8 @@ CREATE TABLE `equipment` (
 --> statement-breakpoint
 CREATE TABLE `exercises` (
 	`id` text PRIMARY KEY NOT NULL,
-	`name` text NOT NULL,
-	`description` text,
+	`name_i18n` text NOT NULL,
+	`description_i18n` text,
 	`image_url` text,
 	`primary_muscle_group` text NOT NULL,
 	`secondary_muscle_groups` text,

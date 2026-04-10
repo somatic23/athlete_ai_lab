@@ -7,16 +7,22 @@ import { Input } from "@/components/ui/input";
 import { ImageUpload } from "@/components/admin/image-upload";
 import Image from "next/image";
 
+type I18n = { de: string; en: string };
 type Equipment = {
   id: string;
-  name: string;
-  description: string | null;
+  name: I18n;
+  description: I18n;
   imageUrl: string | null;
   isActive: boolean;
 };
 
-type FormState = { name: string; description: string; imageUrl: string; isActive: boolean };
-const empty: FormState = { name: "", description: "", imageUrl: "", isActive: true };
+type FormState = { name: I18n; description: I18n; imageUrl: string; isActive: boolean };
+const empty: FormState = {
+  name: { de: "", en: "" },
+  description: { de: "", en: "" },
+  imageUrl: "",
+  isActive: true,
+};
 
 export default function EquipmentPage() {
   const [items, setItems] = useState<Equipment[]>([]);
@@ -35,7 +41,12 @@ export default function EquipmentPage() {
 
   const openCreate = () => { setForm(empty); setEditId(null); setShowForm(true); };
   const openEdit = (item: Equipment) => {
-    setForm({ name: item.name, description: item.description ?? "", imageUrl: item.imageUrl ?? "", isActive: item.isActive });
+    setForm({
+      name: item.name,
+      description: item.description,
+      imageUrl: item.imageUrl ?? "",
+      isActive: item.isActive,
+    });
     setEditId(item.id);
     setShowForm(true);
   };
@@ -54,7 +65,7 @@ export default function EquipmentPage() {
   };
 
   const remove = async (item: Equipment) => {
-    if (!confirm(`"${item.name}" wirklich loeschen?`)) return;
+    if (!confirm(`"${item.name.de}" wirklich loeschen?`)) return;
     setDeleting(item.id);
     await fetch(`/api/admin/equipment/${item.id}`, { method: "DELETE" });
     await load();
@@ -83,21 +94,41 @@ export default function EquipmentPage() {
               folder="equipment"
             />
             <div className="flex flex-1 flex-col gap-4">
-              <Input
-                label="Name"
-                value={form.name}
-                onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
-              />
-              <div className="flex flex-col gap-1.5">
-                <label className="text-xs font-medium uppercase tracking-widest text-on-surface-variant">
-                  Beschreibung
-                </label>
-                <textarea
-                  rows={3}
-                  value={form.description}
-                  onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                  className="w-full rounded-md bg-surface-container-highest px-4 py-3 text-sm text-on-surface placeholder:text-on-surface-variant/50 border-0 outline-none focus:bg-surface-bright focus:border-l-2 focus:border-l-primary-container transition-all resize-none"
+              <div className="grid grid-cols-2 gap-4">
+                <Input
+                  label="Name (DE)"
+                  value={form.name.de}
+                  onChange={(e) => setForm((f) => ({ ...f, name: { ...f.name, de: e.target.value } }))}
                 />
+                <Input
+                  label="Name (EN)"
+                  value={form.name.en}
+                  onChange={(e) => setForm((f) => ({ ...f, name: { ...f.name, en: e.target.value } }))}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-medium uppercase tracking-widest text-on-surface-variant">
+                    Beschreibung (DE)
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={form.description.de}
+                    onChange={(e) => setForm((f) => ({ ...f, description: { ...f.description, de: e.target.value } }))}
+                    className="w-full rounded-md bg-surface-container-highest px-4 py-3 text-sm text-on-surface placeholder:text-on-surface-variant/50 border-0 outline-none focus:bg-surface-bright focus:border-l-2 focus:border-l-primary-container transition-all resize-none"
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-medium uppercase tracking-widest text-on-surface-variant">
+                    Description (EN)
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={form.description.en}
+                    onChange={(e) => setForm((f) => ({ ...f, description: { ...f.description, en: e.target.value } }))}
+                    className="w-full rounded-md bg-surface-container-highest px-4 py-3 text-sm text-on-surface placeholder:text-on-surface-variant/50 border-0 outline-none focus:bg-surface-bright focus:border-l-2 focus:border-l-primary-container transition-all resize-none"
+                  />
+                </div>
               </div>
               <label className="flex items-center gap-2 text-sm text-on-surface">
                 <input
@@ -128,13 +159,14 @@ export default function EquipmentPage() {
             label: "Bild",
             render: (row) =>
               row.imageUrl ? (
-                <Image src={row.imageUrl} alt={row.name} width={40} height={40} className="rounded object-cover" />
+                <Image src={row.imageUrl} alt={row.name.de} width={40} height={40} className="rounded object-cover" />
               ) : (
                 <div className="h-10 w-10 rounded bg-surface-container-high" />
               ),
           },
-          { key: "name", label: "Name" },
-          { key: "description", label: "Beschreibung", render: (r) => r.description ?? "—" },
+          { key: "name_de", label: "Name (DE)", render: (r) => r.name.de },
+          { key: "name_en", label: "Name (EN)", render: (r) => r.name.en },
+          { key: "description", label: "Beschreibung", render: (r) => r.description.de || "—" },
           {
             key: "isActive",
             label: "Status",

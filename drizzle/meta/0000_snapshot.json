@@ -1,7 +1,7 @@
 {
   "version": "6",
   "dialect": "sqlite",
-  "id": "98b335c5-ce33-49e1-8f02-50650541b424",
+  "id": "2388656a-9072-47da-9ec9-60aa0ebd1be2",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "tables": {
     "ai_analysis_reports": {
@@ -449,15 +449,15 @@
           "notNull": true,
           "autoincrement": false
         },
-        "name": {
-          "name": "name",
+        "name_i18n": {
+          "name": "name_i18n",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
-        "description": {
-          "name": "description",
+        "description_i18n": {
+          "name": "description_i18n",
           "type": "text",
           "primaryKey": false,
           "notNull": false,
@@ -509,15 +509,15 @@
           "notNull": true,
           "autoincrement": false
         },
-        "name": {
-          "name": "name",
+        "name_i18n": {
+          "name": "name_i18n",
           "type": "text",
           "primaryKey": false,
           "notNull": true,
           "autoincrement": false
         },
-        "description": {
-          "name": "description",
+        "description_i18n": {
+          "name": "description_i18n",
           "type": "text",
           "primaryKey": false,
           "notNull": false,

@@ -9,35 +9,36 @@ import Image from "next/image";
 import { cn } from "@/lib/utils/cn";
 
 const MUSCLE_GROUPS = [
-  { value: "chest", label: "Brust" },
-  { value: "back", label: "Ruecken" },
-  { value: "shoulders", label: "Schultern" },
-  { value: "biceps", label: "Bizeps" },
-  { value: "triceps", label: "Trizeps" },
-  { value: "forearms", label: "Unterarme" },
-  { value: "quadriceps", label: "Quadrizeps" },
-  { value: "hamstrings", label: "Beinbizeps" },
-  { value: "glutes", label: "Gesaess" },
-  { value: "calves", label: "Waden" },
-  { value: "core", label: "Core" },
-  { value: "full_body", label: "Ganzkörper" },
+  { value: "chest",       label: "Brust" },
+  { value: "back",        label: "Ruecken" },
+  { value: "shoulders",   label: "Schultern" },
+  { value: "biceps",      label: "Bizeps" },
+  { value: "triceps",     label: "Trizeps" },
+  { value: "forearms",    label: "Unterarme" },
+  { value: "quadriceps",  label: "Quadrizeps" },
+  { value: "hamstrings",  label: "Beinbizeps" },
+  { value: "glutes",      label: "Gesaess" },
+  { value: "calves",      label: "Waden" },
+  { value: "core",        label: "Core" },
+  { value: "full_body",   label: "Ganzkörper" },
 ];
 
+type I18n = { de: string; en: string };
 type Exercise = {
   id: string;
-  name: string;
+  name: I18n;
+  description: I18n;
   primaryMuscleGroup: string;
-  description: string | null;
   imageUrl: string | null;
   isActive: boolean;
   requiredEquipmentIds: string | null;
 };
 
-type Equipment = { id: string; name: string };
+type EquipmentItem = { id: string; name: string };
 
 type FormState = {
-  name: string;
-  description: string;
+  name: I18n;
+  description: I18n;
   imageUrl: string;
   primaryMuscleGroup: string;
   instructions: string;
@@ -46,14 +47,18 @@ type FormState = {
 };
 
 const empty: FormState = {
-  name: "", description: "", imageUrl: "",
-  primaryMuscleGroup: "chest", instructions: "",
-  isActive: true, requiredEquipmentIds: [],
+  name: { de: "", en: "" },
+  description: { de: "", en: "" },
+  imageUrl: "",
+  primaryMuscleGroup: "chest",
+  instructions: "",
+  isActive: true,
+  requiredEquipmentIds: [],
 };
 
 export default function ExercisesPage() {
   const [items, setItems] = useState<Exercise[]>([]);
-  const [equipment, setEquipment] = useState<Equipment[]>([]);
+  const [equipmentList, setEquipmentList] = useState<EquipmentItem[]>([]);
   const [form, setForm] = useState<FormState>(empty);
   const [editId, setEditId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -65,7 +70,7 @@ export default function ExercisesPage() {
 
   useEffect(() => {
     load();
-    fetch("/api/equipment").then((r) => r.json()).then(setEquipment);
+    fetch("/api/equipment?locale=de").then((r) => r.json()).then(setEquipmentList);
   }, []);
 
   const openCreate = () => { setForm(empty); setEditId(null); setShowForm(true); };
@@ -73,9 +78,13 @@ export default function ExercisesPage() {
     let eqIds: string[] = [];
     try { eqIds = JSON.parse(item.requiredEquipmentIds ?? "[]"); } catch {}
     setForm({
-      name: item.name, description: item.description ?? "",
-      imageUrl: item.imageUrl ?? "", primaryMuscleGroup: item.primaryMuscleGroup,
-      instructions: "", isActive: item.isActive, requiredEquipmentIds: eqIds,
+      name: item.name,
+      description: item.description,
+      imageUrl: item.imageUrl ?? "",
+      primaryMuscleGroup: item.primaryMuscleGroup,
+      instructions: "",
+      isActive: item.isActive,
+      requiredEquipmentIds: eqIds,
     });
     setEditId(item.id);
     setShowForm(true);
@@ -103,7 +112,7 @@ export default function ExercisesPage() {
   };
 
   const remove = async (item: Exercise) => {
-    if (!confirm(`"${item.name}" wirklich loeschen?`)) return;
+    if (!confirm(`"${item.name.de}" wirklich loeschen?`)) return;
     setDeleting(item.id);
     await fetch(`/api/admin/exercises/${item.id}`, { method: "DELETE" });
     await load();
@@ -137,42 +146,60 @@ export default function ExercisesPage() {
             <div className="flex flex-1 flex-col gap-4">
               <div className="grid grid-cols-2 gap-4">
                 <Input
-                  label="Name"
-                  value={form.name}
-                  onChange={(e) => setForm((f) => ({ ...f, name: e.target.value }))}
+                  label="Name (DE)"
+                  value={form.name.de}
+                  onChange={(e) => setForm((f) => ({ ...f, name: { ...f.name, de: e.target.value } }))}
                 />
-                <div className="flex flex-col gap-1.5">
-                  <label className="text-xs font-medium uppercase tracking-widest text-on-surface-variant">
-                    Primaere Muskelgruppe
-                  </label>
-                  <select
-                    value={form.primaryMuscleGroup}
-                    onChange={(e) => setForm((f) => ({ ...f, primaryMuscleGroup: e.target.value }))}
-                    className="w-full rounded-md bg-surface-container-highest px-4 py-3 text-sm text-on-surface border-0 outline-none focus:bg-surface-bright focus:border-l-2 focus:border-l-primary-container transition-all"
-                  >
-                    {MUSCLE_GROUPS.map((m) => (
-                      <option key={m.value} value={m.value}>{m.label}</option>
-                    ))}
-                  </select>
-                </div>
+                <Input
+                  label="Name (EN)"
+                  value={form.name.en}
+                  onChange={(e) => setForm((f) => ({ ...f, name: { ...f.name, en: e.target.value } }))}
+                />
               </div>
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-medium uppercase tracking-widest text-on-surface-variant">
-                  Beschreibung
+                  Primaere Muskelgruppe
                 </label>
-                <textarea
-                  rows={2}
-                  value={form.description}
-                  onChange={(e) => setForm((f) => ({ ...f, description: e.target.value }))}
-                  className="w-full rounded-md bg-surface-container-highest px-4 py-3 text-sm text-on-surface border-0 outline-none focus:bg-surface-bright focus:border-l-2 focus:border-l-primary-container transition-all resize-none"
-                />
+                <select
+                  value={form.primaryMuscleGroup}
+                  onChange={(e) => setForm((f) => ({ ...f, primaryMuscleGroup: e.target.value }))}
+                  className="w-full rounded-md bg-surface-container-highest px-4 py-3 text-sm text-on-surface border-0 outline-none focus:bg-surface-bright focus:border-l-2 focus:border-l-primary-container transition-all"
+                >
+                  {MUSCLE_GROUPS.map((m) => (
+                    <option key={m.value} value={m.value}>{m.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-medium uppercase tracking-widest text-on-surface-variant">
+                    Beschreibung (DE)
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={form.description.de}
+                    onChange={(e) => setForm((f) => ({ ...f, description: { ...f.description, de: e.target.value } }))}
+                    className="w-full rounded-md bg-surface-container-highest px-4 py-3 text-sm text-on-surface border-0 outline-none focus:bg-surface-bright focus:border-l-2 focus:border-l-primary-container transition-all resize-none"
+                  />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <label className="text-xs font-medium uppercase tracking-widest text-on-surface-variant">
+                    Description (EN)
+                  </label>
+                  <textarea
+                    rows={2}
+                    value={form.description.en}
+                    onChange={(e) => setForm((f) => ({ ...f, description: { ...f.description, en: e.target.value } }))}
+                    className="w-full rounded-md bg-surface-container-highest px-4 py-3 text-sm text-on-surface border-0 outline-none focus:bg-surface-bright focus:border-l-2 focus:border-l-primary-container transition-all resize-none"
+                  />
+                </div>
               </div>
               <div className="flex flex-col gap-1.5">
                 <label className="text-xs font-medium uppercase tracking-widest text-on-surface-variant">
                   Benoetiges Equipment
                 </label>
                 <div className="flex flex-wrap gap-2">
-                  {equipment.map((eq) => (
+                  {equipmentList.map((eq) => (
                     <button
                       key={eq.id}
                       type="button"
@@ -218,12 +245,13 @@ export default function ExercisesPage() {
             label: "Bild",
             render: (row) =>
               row.imageUrl ? (
-                <Image src={row.imageUrl} alt={row.name} width={40} height={40} className="rounded object-cover" />
+                <Image src={row.imageUrl} alt={row.name.de} width={40} height={40} className="rounded object-cover" />
               ) : (
                 <div className="h-10 w-10 rounded bg-surface-container-high" />
               ),
           },
-          { key: "name", label: "Name" },
+          { key: "name_de", label: "Name (DE)", render: (r) => r.name.de },
+          { key: "name_en", label: "Name (EN)", render: (r) => r.name.en },
           { key: "primaryMuscleGroup", label: "Muskelgruppe", render: (r) => muscleLabel(r.primaryMuscleGroup) },
           {
             key: "isActive", label: "Status",

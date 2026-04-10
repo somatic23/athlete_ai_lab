@@ -14,6 +14,29 @@ const loginSchema = z.object({
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   ...authConfig,
+  callbacks: {
+    ...authConfig.callbacks,
+    async jwt({ token, user, trigger }) {
+      // On initial sign-in
+      if (user) {
+        token.id = user.id;
+        token.role = (user as { role?: string }).role;
+        token.onboardingCompleted = (user as { onboardingCompleted?: boolean }).onboardingCompleted;
+      }
+      // On session.update() call — refresh from DB
+      if (trigger === "update" && token.id) {
+        const fresh = await db.query.users.findFirst({
+          where: eq(users.id, token.id as string),
+          columns: { role: true, onboardingCompleted: true },
+        });
+        if (fresh) {
+          token.role = fresh.role;
+          token.onboardingCompleted = fresh.onboardingCompleted;
+        }
+      }
+      return token;
+    },
+  },
   providers: [
     Credentials({
       credentials: {

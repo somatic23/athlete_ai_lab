@@ -34,8 +34,8 @@ export const users = sqliteTable("users", {
 
 export const equipment = sqliteTable("equipment", {
   id: text("id").primaryKey(),
-  name: text("name").notNull(),
-  description: text("description"),
+  nameI18n: text("name_i18n").notNull(), // JSON: { de: string; en: string }
+  descriptionI18n: text("description_i18n"), // JSON: { de: string; en: string }
   imageUrl: text("image_url"),
   isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
   createdAt: text("created_at")
@@ -57,8 +57,8 @@ export const userEquipment = sqliteTable("user_equipment", {
 
 export const exercises = sqliteTable("exercises", {
   id: text("id").primaryKey(),
-  name: text("name").notNull(),
-  description: text("description"),
+  nameI18n: text("name_i18n").notNull(), // JSON: { de: string; en: string }
+  descriptionI18n: text("description_i18n"), // JSON: { de: string; en: string }
   imageUrl: text("image_url"),
   primaryMuscleGroup: text("primary_muscle_group", {
     enum: [

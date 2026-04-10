@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -48,6 +49,7 @@ const GENDER_OPTIONS = [
 
 export default function OnboardingPage() {
   const router = useRouter();
+  const { update } = useSession();
   const [step, setStep] = useState(1);
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [selectedEquipment, setSelectedEquipment] = useState<string[]>([]);
@@ -93,8 +95,9 @@ export default function OnboardingPage() {
     });
 
     if (res.ok) {
+      // Trigger JWT update so middleware reads onboardingCompleted: true
+      await update();
       router.push("/coach");
-      router.refresh();
     }
     setIsSubmitting(false);
   };
