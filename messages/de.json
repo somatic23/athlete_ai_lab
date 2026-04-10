@@ -1,0 +1,64 @@
+{
+  "common": {
+    "appName": "Athlete AI Lab",
+    "loading": "Laden...",
+    "save": "Speichern",
+    "cancel": "Abbrechen",
+    "delete": "Loeschen",
+    "edit": "Bearbeiten",
+    "create": "Erstellen",
+    "back": "Zurueck",
+    "next": "Weiter",
+    "confirm": "Bestaetigen",
+    "search": "Suchen",
+    "noResults": "Keine Ergebnisse",
+    "error": "Fehler",
+    "success": "Erfolgreich"
+  },
+  "nav": {
+    "coach": "AI Coach",
+    "plans": "Trainingsplaene",
+    "calendar": "Kalender",
+    "workout": "Training",
+    "history": "Historie",
+    "records": "Bestleistungen",
+    "settings": "Einstellungen",
+    "admin": "Administration"
+  },
+  "auth": {
+    "login": "Anmelden",
+    "register": "Registrieren",
+    "email": "E-Mail",
+    "password": "Passwort",
+    "confirmPassword": "Passwort bestaetigen",
+    "logout": "Abmelden",
+    "forgotPassword": "Passwort vergessen?"
+  },
+  "onboarding": {
+    "welcome": "Willkommen bei Athlete AI Lab",
+    "subtitle": "Lass uns dein Profil einrichten",
+    "personalInfo": "Persoenliche Daten",
+    "name": "Name",
+    "age": "Alter",
+    "gender": "Geschlecht",
+    "genderMale": "Maennlich",
+    "genderFemale": "Weiblich",
+    "genderDiverse": "Divers",
+    "weight": "Gewicht (kg)",
+    "height": "Groesse (cm)",
+    "bodyFat": "Koerperfettanteil (%)",
+    "goals": "Trainingsziele",
+    "experience": "Erfahrungslevel",
+    "experienceBeginner": "Anfaenger",
+    "experienceIntermediate": "Fortgeschritten",
+    "experienceAdvanced": "Erfahren",
+    "experienceExpert": "Experte",
+    "equipment": "Verfuegbares Equipment",
+    "injuries": "Einschraenkungen / Verletzungen",
+    "injuriesPlaceholder": "z.B. Schulterverletzung links, Bandscheibenvorfall L5/S1..."
+  },
+  "landing": {
+    "title": "ATHLETE AI LAB",
+    "subtitle": "Dein KI-gesteuerter Strength Coach"
+  }
+}

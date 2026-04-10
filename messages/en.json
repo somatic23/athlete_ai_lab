@@ -1,0 +1,64 @@
+{
+  "common": {
+    "appName": "Athlete AI Lab",
+    "loading": "Loading...",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "create": "Create",
+    "back": "Back",
+    "next": "Next",
+    "confirm": "Confirm",
+    "search": "Search",
+    "noResults": "No results",
+    "error": "Error",
+    "success": "Success"
+  },
+  "nav": {
+    "coach": "AI Coach",
+    "plans": "Training Plans",
+    "calendar": "Calendar",
+    "workout": "Workout",
+    "history": "History",
+    "records": "Records",
+    "settings": "Settings",
+    "admin": "Administration"
+  },
+  "auth": {
+    "login": "Sign In",
+    "register": "Sign Up",
+    "email": "Email",
+    "password": "Password",
+    "confirmPassword": "Confirm Password",
+    "logout": "Sign Out",
+    "forgotPassword": "Forgot password?"
+  },
+  "onboarding": {
+    "welcome": "Welcome to Athlete AI Lab",
+    "subtitle": "Let's set up your profile",
+    "personalInfo": "Personal Information",
+    "name": "Name",
+    "age": "Age",
+    "gender": "Gender",
+    "genderMale": "Male",
+    "genderFemale": "Female",
+    "genderDiverse": "Diverse",
+    "weight": "Weight (kg)",
+    "height": "Height (cm)",
+    "bodyFat": "Body Fat (%)",
+    "goals": "Training Goals",
+    "experience": "Experience Level",
+    "experienceBeginner": "Beginner",
+    "experienceIntermediate": "Intermediate",
+    "experienceAdvanced": "Advanced",
+    "experienceExpert": "Expert",
+    "equipment": "Available Equipment",
+    "injuries": "Limitations / Injuries",
+    "injuriesPlaceholder": "e.g. Left shoulder injury, herniated disc L5/S1..."
+  },
+  "landing": {
+    "title": "ATHLETE AI LAB",
+    "subtitle": "Your AI-powered Strength Coach"
+  }
+}

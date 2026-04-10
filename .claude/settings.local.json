@@ -1,0 +1,13 @@
+{
+  "permissions": {
+    "allow": [
+      "mcp__stitch__get_screen",
+      "WebFetch(domain:contribution.usercontent.google.com)",
+      "Bash(cd /tmp)",
+      "Bash(rm -rf athlete-ai-lab)",
+      "Bash(npx create-next-app@latest athlete-ai-lab --typescript --tailwind --eslint --app --src-dir --import-alias \"@/*\" --turbopack --yes)",
+      "Bash(rm -rf temp-next-init)",
+      "Bash(npx create-next-app@latest temp-next-init --typescript --tailwind --eslint --app --src-dir --import-alias \"@/*\" --turbopack --yes)"
+    ]
+  }
+}

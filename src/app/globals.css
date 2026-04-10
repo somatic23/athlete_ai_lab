@@ -1,0 +1,251 @@
+@import "tailwindcss";
+
+/* =============================================
+   DESIGN SYSTEM: Editorial Athleticism
+   Based on Stitch project "AI Coach Chat"
+   ============================================= */
+
+:root {
+  /* Surface hierarchy */
+  --surface: #0e0e0e;
+  --surface-dim: #0e0e0e;
+  --surface-bright: #2c2c2c;
+  --surface-container-lowest: #000000;
+  --surface-container-low: #131313;
+  --surface-container: #1a1a1a;
+  --surface-container-high: #20201f;
+  --surface-container-highest: #262626;
+  --surface-variant: #262626;
+  --surface-tint: #f3ffca;
+
+  /* Primary - Electric Lime */
+  --primary: #f3ffca;
+  --primary-container: #cafd00;
+  --primary-dim: #beee00;
+  --primary-fixed: #cafd00;
+  --primary-fixed-dim: #beee00;
+  --on-primary: #516700;
+  --on-primary-container: #4a5e00;
+  --on-primary-fixed: #3a4a00;
+  --on-primary-fixed-variant: #526900;
+  --inverse-primary: #516700;
+
+  /* Secondary - Cyan */
+  --secondary: #00e3fd;
+  --secondary-container: #006875;
+  --secondary-dim: #00d4ec;
+  --secondary-fixed: #26e6ff;
+  --secondary-fixed-dim: #00d7f0;
+  --on-secondary: #004d57;
+  --on-secondary-container: #e8fbff;
+  --on-secondary-fixed: #003a42;
+  --on-secondary-fixed-variant: #005964;
+
+  /* Tertiary - Gold */
+  --tertiary: #ffeea5;
+  --tertiary-container: #fce047;
+  --tertiary-dim: #edd13a;
+  --tertiary-fixed: #fce047;
+  --tertiary-fixed-dim: #edd13a;
+  --on-tertiary: #665800;
+  --on-tertiary-container: #5d5000;
+  --on-tertiary-fixed: #483d00;
+  --on-tertiary-fixed-variant: #685900;
+
+  /* Error */
+  --error: #ff7351;
+  --error-container: #b92902;
+  --error-dim: #d53d18;
+  --on-error: #450900;
+  --on-error-container: #ffd2c8;
+
+  /* On-surface */
+  --on-surface: #ffffff;
+  --on-surface-variant: #adaaaa;
+  --on-background: #ffffff;
+  --background: #0e0e0e;
+  --inverse-surface: #fcf9f8;
+  --inverse-on-surface: #565555;
+
+  /* Outline */
+  --outline: #767575;
+  --outline-variant: #484847;
+
+  /* Typography */
+  --font-headline: "Space Grotesk", sans-serif;
+  --font-body: "Inter", sans-serif;
+
+  /* Spacing scale (base 2) */
+  --spacing-1: 0.125rem;
+  --spacing-2: 0.25rem;
+  --spacing-3: 0.375rem;
+  --spacing-4: 0.5rem;
+  --spacing-5: 0.625rem;
+  --spacing-6: 0.75rem;
+  --spacing-8: 1rem;
+  --spacing-10: 1.25rem;
+  --spacing-12: 1.5rem;
+  --spacing-16: 2rem;
+  --spacing-20: 2.5rem;
+  --spacing-24: 3rem;
+
+  /* Border radius */
+  --radius-none: 0px;
+  --radius-sm: 0.125rem;
+  --radius-md: 0.375rem;
+  --radius-lg: 0.5rem;
+  --radius-xl: 0.75rem;
+  --radius-full: 9999px;
+}
+
+@theme inline {
+  /* Colors */
+  --color-surface: var(--surface);
+  --color-surface-dim: var(--surface-dim);
+  --color-surface-bright: var(--surface-bright);
+  --color-surface-container-lowest: var(--surface-container-lowest);
+  --color-surface-container-low: var(--surface-container-low);
+  --color-surface-container: var(--surface-container);
+  --color-surface-container-high: var(--surface-container-high);
+  --color-surface-container-highest: var(--surface-container-highest);
+  --color-surface-variant: var(--surface-variant);
+
+  --color-primary: var(--primary);
+  --color-primary-container: var(--primary-container);
+  --color-primary-dim: var(--primary-dim);
+  --color-on-primary: var(--on-primary);
+  --color-on-primary-container: var(--on-primary-container);
+
+  --color-secondary: var(--secondary);
+  --color-secondary-container: var(--secondary-container);
+  --color-secondary-dim: var(--secondary-dim);
+  --color-on-secondary: var(--on-secondary);
+  --color-on-secondary-container: var(--on-secondary-container);
+
+  --color-tertiary: var(--tertiary);
+  --color-tertiary-container: var(--tertiary-container);
+  --color-on-tertiary: var(--on-tertiary);
+  --color-on-tertiary-container: var(--on-tertiary-container);
+
+  --color-error: var(--error);
+  --color-error-container: var(--error-container);
+  --color-on-error: var(--on-error);
+  --color-on-error-container: var(--on-error-container);
+
+  --color-on-surface: var(--on-surface);
+  --color-on-surface-variant: var(--on-surface-variant);
+  --color-on-background: var(--on-background);
+  --color-background: var(--background);
+  --color-outline: var(--outline);
+  --color-outline-variant: var(--outline-variant);
+
+  /* Typography */
+  --font-headline: var(--font-headline);
+  --font-body: var(--font-body);
+
+  /* Border radius */
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius-md);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
+}
+
+/* =============================================
+   BASE STYLES
+   ============================================= */
+
+body {
+  background: var(--surface);
+  color: var(--on-surface);
+  font-family: var(--font-body);
+}
+
+/* =============================================
+   DESIGN SYSTEM UTILITIES
+   ============================================= */
+
+/* Ambient glow for FABs and floating elements */
+.ambient-glow {
+  box-shadow: 0 0 40px 0 rgba(202, 253, 0, 0.1);
+}
+
+.ambient-glow-secondary {
+  box-shadow: 0 0 40px 0 rgba(0, 227, 253, 0.1);
+}
+
+/* Glassmorphism for navigation */
+.glass {
+  background: rgba(14, 14, 14, 0.6);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+}
+
+/* Scanline texture overlay */
+.scanlines::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(255, 255, 255, 0.02) 2px,
+    rgba(255, 255, 255, 0.02) 4px
+  );
+  z-index: 1;
+}
+
+/* Grain texture */
+.grain::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.02;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  z-index: 1;
+}
+
+/* Ghost border fallback (15% opacity outline-variant) */
+.ghost-border {
+  border: 1px solid rgba(72, 72, 71, 0.15);
+}
+
+/* Input focus style - left accent, no border */
+.input-focus {
+  background: var(--surface-container-highest);
+  border: none;
+  outline: none;
+  transition: background 0.2s, border-left 0.2s;
+}
+
+.input-focus:focus {
+  background: var(--surface-bright);
+  border-left: 2px solid var(--primary-container);
+}
+
+/* Liquid light gradient for primary CTAs */
+.btn-liquid {
+  background: linear-gradient(135deg, var(--primary), var(--primary-container));
+}
+
+/* Hide scrollbar utility */
+.hide-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.hide-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* Intensity badge - sharp corners, error container */
+.intensity-badge {
+  background: var(--error-container);
+  color: var(--error);
+  border-radius: 0;
+  font-size: 0.75rem;
+  font-weight: 600;
+  padding: 0.125rem 0.5rem;
+}
