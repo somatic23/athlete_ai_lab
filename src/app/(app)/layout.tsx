@@ -2,6 +2,7 @@
 
 import { usePathname } from "next/navigation";
 import Link from "next/link";
+import { signOut } from "next-auth/react";
 import { cn } from "@/lib/utils/cn";
 
 const NAV_ITEMS = [
@@ -49,13 +50,19 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </ul>
         </nav>
 
-        <div className="px-5 py-5">
+        <div className="flex flex-col gap-1 px-5 py-5">
           <Link
             href="/settings"
             className="text-xs text-on-surface-variant hover:text-on-surface transition-colors"
           >
             Einstellungen
           </Link>
+          <button
+            onClick={() => signOut({ redirectTo: "/login" })}
+            className="text-left text-xs text-on-surface-variant/60 hover:text-error transition-colors"
+          >
+            Abmelden
+          </button>
         </div>
       </aside>
 

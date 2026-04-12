@@ -29,10 +29,13 @@ export default auth((req: NextRequest & { auth?: { user?: { role?: string; onboa
   }
 
   // Logged in but onboarding not done
+  // API routes must always pass through — the fetch would otherwise silently
+  // follow the redirect and return 200 HTML instead of the expected JSON.
   if (
     session?.user &&
     !session.user.onboardingCompleted &&
     !pathname.startsWith("/onboarding") &&
+    !pathname.startsWith("/api/") &&
     !isPublic
   ) {
     return NextResponse.redirect(new URL("/onboarding", req.url));

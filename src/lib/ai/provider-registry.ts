@@ -13,10 +13,12 @@ function buildModel(row: ProviderRow): LanguageModel {
 
   switch (provider) {
     case "openai":
+      // Use .chat() to force Chat Completions API; the SDK default (Responses API)
+      // injects item_reference blocks that break multi-turn conversations.
       return createOpenAI({
         apiKey: apiKey ?? undefined,
         baseURL: baseUrl ?? undefined,
-      })(modelId);
+      }).chat(modelId);
 
     case "anthropic":
       return createAnthropic({ apiKey: apiKey ?? undefined })(modelId);
@@ -25,18 +27,20 @@ function buildModel(row: ProviderRow): LanguageModel {
       return createGoogleGenerativeAI({ apiKey: apiKey ?? undefined })(modelId);
 
     case "openrouter":
+      // OpenRouter only supports Chat Completions, not the Responses API.
       return createOpenAI({
         apiKey: apiKey ?? undefined,
         baseURL: baseUrl || "https://openrouter.ai/api/v1",
-      })(modelId);
+      }).chat(modelId);
 
     case "ollama": {
       const ollamaBase = (baseUrl ?? "http://localhost:11434").replace(/\/+$/, "");
       const ollamaUrl = ollamaBase.endsWith("/v1") ? ollamaBase : `${ollamaBase}/v1`;
+      // Ollama only supports Chat Completions, not the Responses API.
       return createOpenAI({
         apiKey: "ollama",
         baseURL: ollamaUrl,
-      })(modelId);
+      }).chat(modelId);
     }
 
     default:

@@ -6,7 +6,7 @@ import { eq } from "drizzle-orm";
 import { z } from "zod";
 
 const onboardingSchema = z.object({
-  age: z.number().min(10).max(100).optional(),
+  birthDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
   gender: z.enum(["male", "female", "diverse"]).optional(),
   weightKg: z.number().min(20).max(500).optional(),
   heightCm: z.number().min(50).max(300).optional(),

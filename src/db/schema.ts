@@ -11,7 +11,7 @@ export const users = sqliteTable("users", {
   passwordHash: text("password_hash").notNull(),
   role: text("role", { enum: ["user", "admin"] }).notNull().default("user"),
   displayName: text("display_name").notNull(),
-  age: integer("age"),
+  birthDate: text("birth_date"), // ISO date YYYY-MM-DD
   gender: text("gender", { enum: ["male", "female", "diverse"] }),
   weightKg: real("weight_kg"),
   heightCm: integer("height_cm"),

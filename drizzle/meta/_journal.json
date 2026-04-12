@@ -8,6 +8,13 @@
       "when": 1775837788125,
       "tag": "0000_cultured_venom",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1744358400000,
+      "tag": "0001_add_birth_date",
+      "breakpoints": true
     }
   ]
 }

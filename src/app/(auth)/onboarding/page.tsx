@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -11,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils/cn";
 
 const schema = z.object({
-  age: z.number().min(10).max(100).optional(),
+  birthDate: z.string().optional(),
   gender: z.enum(["male", "female", "diverse"]).optional(),
   weightKg: z.number().min(20).max(500).optional(),
   heightCm: z.number().min(50).max(300).optional(),
@@ -48,9 +47,10 @@ const GENDER_OPTIONS = [
 ];
 
 export default function OnboardingPage() {
-  const router = useRouter();
   const { update } = useSession();
   const [step, setStep] = useState(1);
+  const [done, setDone] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [selectedEquipment, setSelectedEquipment] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -86,18 +86,33 @@ export default function OnboardingPage() {
 
   const handleFinish = async () => {
     setIsSubmitting(true);
+    setSubmitError(null);
     const data = getValues();
+    // Strip NaN values produced by empty number inputs (valueAsNumber: true)
+    // so Zod treats them as absent optional fields rather than null
+    const sanitize = (obj: Record<string, unknown>) =>
+      Object.fromEntries(
+        Object.entries(obj).filter(([, v]) => !(typeof v === "number" && isNaN(v as number)))
+      );
 
-    const res = await fetch("/api/onboarding", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ ...data, equipmentIds: selectedEquipment }),
-    });
+    try {
+      const res = await fetch("/api/onboarding", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...sanitize(data as Record<string, unknown>), equipmentIds: selectedEquipment }),
+      });
 
-    if (res.ok) {
-      // Trigger JWT update so middleware reads onboardingCompleted: true
-      await update();
-      router.push("/coach");
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({}));
+        setSubmitError(body.error ?? `Fehler (${res.status})`);
+      } else {
+        // Refresh JWT first — middleware must see onboardingCompleted: true
+        // before the success screen's "Los geht's" button is clickable.
+        await update();
+        setDone(true);
+      }
+    } catch {
+      setSubmitError("Verbindungsfehler. Bitte erneut versuchen.");
     }
     setIsSubmitting(false);
   };
@@ -105,18 +120,55 @@ export default function OnboardingPage() {
   return (
     <div className="min-h-screen bg-surface flex flex-col items-center justify-center p-4">
       <div className="w-full max-w-lg">
+
+        {/* ── Success screen ── */}
+        {done && (
+          <div className="rounded-xl bg-surface-container p-10 text-center flex flex-col items-center gap-5">
+            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-secondary-container/40">
+              <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+                <path d="M6 16L13 23L26 9" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="text-secondary" />
+              </svg>
+            </div>
+            <div>
+              <h2 className="font-headline text-xl font-bold text-on-surface">Profil erstellt</h2>
+              <p className="mt-2 text-sm text-on-surface-variant max-w-xs mx-auto">
+                Dein Athleten-Profil wurde erfolgreich eingerichtet. Atlas ist bereit, dir zu helfen.
+              </p>
+            </div>
+            {selectedEquipment.length > 0 && (
+              <div className="w-full rounded-lg bg-surface-container-high px-4 py-3 text-left">
+                <p className="text-xs font-mono uppercase tracking-wider text-on-surface-variant mb-2">
+                  Dein Equipment ({selectedEquipment.length})
+                </p>
+                <p className="text-sm text-on-surface">
+                  {equipment
+                    .filter((e) => selectedEquipment.includes(e.id))
+                    .map((e) => e.name)
+                    .join(", ")}
+                </p>
+              </div>
+            )}
+            <button
+              onClick={() => { window.location.href = "/coach"; }}
+              className="mt-2 w-full rounded-md bg-primary-container px-5 py-3 font-headline text-sm font-medium uppercase tracking-wide text-on-primary transition-all hover:opacity-90 active:scale-95"
+            >
+              Los geht&apos;s →
+            </button>
+          </div>
+        )}
+
         {/* Header */}
-        <div className="mb-8 text-center">
+        {!done && <div className="mb-8 text-center">
           <h1 className="font-headline text-2xl font-bold text-primary">
             ATHLETE AI LAB
           </h1>
           <p className="mt-1 text-sm text-on-surface-variant">
             Lass uns dein Profil einrichten
           </p>
-        </div>
+        </div>}
 
         {/* Step indicators */}
-        <div className="mb-8 flex items-center justify-center gap-2">
+        {!done && <div className="mb-8 flex items-center justify-center gap-2">
           {STEPS.map((s, i) => (
             <div key={s.id} className="flex items-center gap-2">
               <div
@@ -151,10 +203,10 @@ export default function OnboardingPage() {
               )}
             </div>
           ))}
-        </div>
+        </div>}
 
         {/* Card */}
-        <div className="rounded-xl bg-surface-container p-8">
+        {!done && <div className="rounded-xl bg-surface-container p-8">
           <h2 className="mb-6 font-headline text-lg font-semibold text-on-surface">
             {STEPS[step - 1].title}
           </h2>
@@ -164,12 +216,11 @@ export default function OnboardingPage() {
             <div className="flex flex-col gap-4">
               <div className="grid grid-cols-2 gap-4">
                 <Input
-                  id="age"
-                  type="number"
-                  label="Alter"
-                  placeholder="25"
-                  error={errors.age?.message}
-                  {...register("age", { valueAsNumber: true })}
+                  id="birthDate"
+                  type="date"
+                  label="Geburtsdatum"
+                  error={errors.birthDate?.message}
+                  {...register("birthDate")}
                 />
                 <Input
                   id="weightKg"
@@ -322,6 +373,13 @@ export default function OnboardingPage() {
             </div>
           )}
 
+          {/* Submit error */}
+          {submitError && (
+            <p className="mt-4 rounded-md bg-error-container/20 px-3 py-2 text-xs text-error">
+              {submitError}
+            </p>
+          )}
+
           {/* Navigation */}
           <div className="mt-8 flex items-center justify-between">
             <Button
@@ -346,17 +404,17 @@ export default function OnboardingPage() {
               </Button>
             )}
           </div>
-        </div>
+        </div>}
 
         {/* Skip link */}
-        <p className="mt-4 text-center text-xs text-on-surface-variant">
+        {!done && <p className="mt-4 text-center text-xs text-on-surface-variant">
           <button
             onClick={handleFinish}
             className="hover:text-primary hover:underline"
           >
             Ueberspringen &rarr;
           </button>
-        </p>
+        </p>}
       </div>
     </div>
   );

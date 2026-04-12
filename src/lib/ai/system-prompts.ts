@@ -1,5 +1,6 @@
 import type { equipment, exercises, users } from "@/db/schema";
 import { parseI18n } from "@/lib/utils/i18n";
+import { calculateAge } from "@/lib/utils/age";
 
 type UserProfile = typeof users.$inferSelect;
 
@@ -20,7 +21,8 @@ function profileSection(user: UserProfile | null): string {
   if (!user) return "";
 
   const lines: string[] = [];
-  if (user.age) lines.push(`- Alter: ${user.age} Jahre`);
+  const age = calculateAge(user.birthDate);
+  if (age) lines.push(`- Alter: ${age} Jahre`);
   if (user.gender) lines.push(`- Geschlecht: ${GENDER_LABELS[user.gender] ?? user.gender}`);
   if (user.weightKg) lines.push(`- Koerpergewicht: ${user.weightKg} kg`);
   if (user.heightCm) lines.push(`- Koerpergroesse: ${user.heightCm} cm`);
@@ -77,98 +79,73 @@ export function buildPlanGenerationPrompt(
 
   const w = user.weightKg ? `${user.weightKg} kg` : "unknown";
   const h = user.heightCm ? `${user.heightCm} cm` : "unknown";
+  const age = calculateAge(user.birthDate);
 
-  return `You are an elite AI Strength Coach specialized in hypertrophy, strength training, injury prevention, and long-term progression.
+  return `You are an elite AI Strength Coach. Generate a complete, structured training plan for the athlete described below.
 
-Your job is to:
-
-1. Interview the user step by step. Only ask one question per answer.
-2. Understand their goals
-3. Consider injuries and equipment
-4. Generate a structured training plan
-5. Output the result in STRICT JSON format
-
-Never output explanations outside JSON when generating the plan.
+Output ONLY the JSON object — no explanation, no markdown, no preamble.
 
 ---
 
-USER PROFILE
+ATHLETE PROFILE
 Name: ${user.displayName}
-Age: ${user.age ?? "unknown"}
+Age: ${age ?? "unknown"}
 Gender: ${user.gender ?? "unknown"}
 Weight: ${w}
 Height: ${h}
+Experience: ${EXPERIENCE_LABELS[user.experienceLevel ?? ""] ?? user.experienceLevel ?? "unknown"}
+Goal: ${user.goals || "General fitness and strength"}
+Injuries / Limitations: ${user.injuriesLimitations || "None"}
 
-Available Equipment:
+AVAILABLE EQUIPMENT
 ${equipmentList}
-
-Injuries / Limitations:
-${user.injuriesLimitations || "None"}
-
-Training Experience:
-${EXPERIENCE_LABELS[user.experienceLevel ?? ""] ?? user.experienceLevel ?? "unknown"}
-
-Goal:
-${user.goals || "General fitness and strength"}
 
 ---
 
-AVAILABLE EXERCISES
+EXERCISE CATALOG (use ONLY these exercises, reference by exact id)
 ${exerciseCatalog}
 
 ---
 
 RULES
-
-You must:
-
-* Avoid exercises that conflict with injuries
-* Only use exercises listed above (matching by id)
-* Ensure balanced muscle group coverage
-* Respect recovery times
-* Adjust difficulty to experience level
-* Keep workouts between 45 and 75 minutes
-* Limit exercises per session to 5–8
-* Provide realistic weight suggestions
-
-Progression model:
-Beginner → Linear progression
-Intermediate → Double progression
-Advanced → Periodization
+- Only use exercises from the catalog above (match by id field)
+- Do not include exercises that require equipment the athlete does not have
+- Avoid exercises that conflict with injuries or limitations
+- Balance muscle group coverage across the week
+- Adjust volume and intensity to the athlete's experience level
+- Keep each session 45–75 minutes, 5–8 exercises per session
+- Provide realistic weight suggestions based on experience level
+- Progression: Beginner → linear, Intermediate → double progression, Advanced → periodization
 
 ---
 
-OUTPUT FORMAT
-
-Return ONLY valid JSON matching this exact structure. No markdown, no explanation:
+OUTPUT SCHEMA (fill every field, no nulls)
 
 {
-  "planName": "",
-  "goal": "",
+  "planName": "descriptive plan name",
+  "goal": "primary training goal",
   "durationWeeks": 8,
-  "experienceLevel": "",
+  "experienceLevel": "beginner|intermediate|advanced|expert",
   "trainingDaysPerWeek": 3,
   "trainingDays": [
     {
-      "dayName": "",
-      "focus": "",
+      "dayName": "Day A – Chest & Triceps",
+      "focus": "Chest, Triceps",
       "estimatedDurationMinutes": 60,
       "exercises": [
         {
-          "exerciseId": "",
-          "exerciseName": "",
+          "exerciseId": "<exact id from catalog>",
+          "exerciseName": "<exercise name>",
           "sets": 4,
           "reps": "8-12",
-          "weightSuggestion": "",
+          "weightSuggestion": "60 kg",
           "restSeconds": 90,
-          "notes": ""
+          "notes": "technique cue or empty string"
         }
       ]
     }
   ]
-}
-
-Do not include exercises that require equipment the user does not have.`;
+}`;
 }
 
 export function buildCoachSystemPrompt(user: UserProfile | null): string {
