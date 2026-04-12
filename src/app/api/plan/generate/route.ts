@@ -1,11 +1,11 @@
-import { generateObject, generateText } from "ai";
+import { generateObject, generateText, convertToModelMessages } from "ai";
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth/config";
 import { db } from "@/db";
 import { users, equipment, exercises, userEquipment } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { getDefaultModel } from "@/lib/ai/provider-registry";
-import { buildPlanGenerationPrompt } from "@/lib/ai/system-prompts";
+import { buildPlanGenerationPrompt, buildCoachSystemPrompt, buildPlanJsonRequest } from "@/lib/ai/system-prompts";
 import { generatedPlanSchema } from "@/lib/ai/plan-schema";
 import { logger } from "@/lib/utils/logger";
 
@@ -34,28 +34,25 @@ export async function POST(req: Request) {
   }
 
   const userId = session.user.id;
+  const body = await req.json().catch(() => ({}));
+  // Optional: existing UI messages from the chat conversation
+  const chatMessages = Array.isArray(body.messages) ? body.messages : null;
 
-  const user = await db.query.users.findFirst({
-    where: eq(users.id, userId),
-  });
+  const [user, userEquipmentRows, allExercises] = await Promise.all([
+    db.query.users.findFirst({ where: eq(users.id, userId) }),
+    db
+      .select({ eq: equipment })
+      .from(userEquipment)
+      .innerJoin(equipment, eq(userEquipment.equipmentId, equipment.id))
+      .where(eq(userEquipment.userId, userId)),
+    db.query.exercises.findMany({ where: eq(exercises.isActive, true) }),
+  ]);
 
   if (!user) {
     return NextResponse.json({ error: "User not found" }, { status: 404 });
   }
 
-  // Load user's equipment
-  const userEquipmentRows = await db
-    .select({ eq: equipment })
-    .from(userEquipment)
-    .innerJoin(equipment, eq(userEquipment.equipmentId, equipment.id))
-    .where(eq(userEquipment.userId, userId));
-
   const userEquipmentList = userEquipmentRows.map((r) => r.eq);
-
-  // Load full exercise catalog
-  const allExercises = await db.query.exercises.findMany({
-    where: eq(exercises.isActive, true),
-  });
 
   let model;
   try {
@@ -65,8 +62,6 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: message }, { status: 503 });
   }
 
-  const prompt = buildPlanGenerationPrompt(user, userEquipmentList, allExercises);
-
   await logger.info("plan.generate.request", {
     userId,
     metadata: {
@@ -74,18 +69,41 @@ export async function POST(req: Request) {
       equipmentCount: userEquipmentList.length,
       goal: user.goals?.slice(0, 100),
       experience: user.experienceLevel,
-      prompt,
+      mode: chatMessages ? "chat-history" : "fresh-prompt",
     },
   });
 
   const startedAt = Date.now();
+
+  // ── Build inputs based on mode ─────────────────────────────────────────────
+  // Chat-history mode: append JSON request to the existing conversation
+  // Fresh mode: use a standalone prompt with the full plan generation instructions
+
+  const isChatMode = !!chatMessages;
+
+  const systemForGenerate = isChatMode
+    ? buildCoachSystemPrompt(user, userEquipmentList, allExercises)
+    : undefined;
+
+  const messagesForGenerate = isChatMode
+    ? [
+        ...(await convertToModelMessages(chatMessages)),
+        { role: "user" as const, content: [{ type: "text" as const, text: buildPlanJsonRequest() }] },
+      ]
+    : undefined;
+
+  const promptForGenerate = isChatMode
+    ? undefined
+    : buildPlanGenerationPrompt(user, userEquipmentList, allExercises);
 
   // ── Attempt 1: generateObject with schema enforcement ──────────────────────
   try {
     const { object } = await generateObject({
       model,
       schema: generatedPlanSchema,
-      prompt,
+      ...(isChatMode
+        ? { system: systemForGenerate, messages: messagesForGenerate }
+        : { prompt: promptForGenerate }),
     });
 
     await logger.info("plan.generate.success", {
@@ -110,18 +128,29 @@ export async function POST(req: Request) {
   }
 
   // ── Attempt 2: generateText + manual extraction ────────────────────────────
-  // Ask the model to correct itself: output raw JSON only, no markdown.
-  const retryPrompt =
-    `${prompt}\n\n` +
-    `IMPORTANT: Your previous response could not be parsed as valid JSON.\n` +
-    `Output ONLY the raw JSON object — no markdown, no backticks, no code fences, no explanation.\n` +
+  const retryInstruction =
+    `IMPORTANT: Your previous response could not be parsed as valid JSON. ` +
+    `Output ONLY the raw JSON object — no markdown, no backticks, no code fences, no explanation. ` +
     `Your response must start with { and end with }.`;
+
+  const retryMessages = isChatMode
+    ? [
+        ...(messagesForGenerate ?? []),
+        { role: "user" as const, content: [{ type: "text" as const, text: retryInstruction }] },
+      ]
+    : undefined;
+
+  const retryPrompt = isChatMode
+    ? undefined
+    : `${promptForGenerate}\n\n${retryInstruction}`;
 
   try {
     const { text } = await generateText({
       model,
-      prompt: retryPrompt,
       maxOutputTokens: 4096,
+      ...(isChatMode
+        ? { system: systemForGenerate, messages: retryMessages }
+        : { prompt: retryPrompt }),
     });
 
     const extracted = extractJson(text);

@@ -158,7 +158,13 @@ export default function NewPlanPage() {
     setStage("generating");
     setError(null);
     try {
-      const res = await fetch("/api/plan/generate", { method: "POST" });
+      const res = await fetch("/api/plan/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        // Pass the current conversation so the route can derive the plan
+        // from what Atlas already discussed, instead of a fresh prompt.
+        body: JSON.stringify({ messages }),
+      });
       if (!res.ok) {
         const data = await res.json();
         throw new Error(data.error ?? "Fehler beim Generieren");

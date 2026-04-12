@@ -2,7 +2,7 @@ import { streamText, convertToModelMessages } from "ai";
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth/config";
 import { db } from "@/db";
-import { users, aiProviders } from "@/db/schema";
+import { users, aiProviders, equipment, userEquipment, exercises } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
 import { getDefaultModel } from "@/lib/ai/provider-registry";
 import { buildCoachSystemPrompt } from "@/lib/ai/system-prompts";
@@ -30,6 +30,18 @@ export async function POST(req: Request) {
     columns: { provider: true, modelId: true, displayName: true },
   });
 
+  const [user, userEquipmentRows, allExercises] = await Promise.all([
+    db.query.users.findFirst({ where: eq(users.id, userId) }),
+    db
+      .select({ eq: equipment })
+      .from(userEquipment)
+      .innerJoin(equipment, eq(userEquipment.equipmentId, equipment.id))
+      .where(eq(userEquipment.userId, userId)),
+    db.query.exercises.findMany({ where: eq(exercises.isActive, true) }),
+  ]);
+
+  const userEquipmentList = userEquipmentRows.map((r) => r.eq);
+
   await logger.info("chat.request", {
     userId,
     metadata: {
@@ -37,14 +49,8 @@ export async function POST(req: Request) {
       model: activeProvider?.modelId ?? "unknown",
       messageCount: messages?.length ?? 0,
       lastUserMessage: lastUserMessage.slice(0, 200),
-      systemPrompt: buildCoachSystemPrompt(
-        await db.query.users.findFirst({ where: eq(users.id, userId) }) ?? null
-      ),
+      systemPrompt: buildCoachSystemPrompt(user ?? null, userEquipmentList, allExercises),
     },
-  });
-
-  const user = await db.query.users.findFirst({
-    where: eq(users.id, userId),
   });
 
   // JWT is valid but user no longer exists in DB (e.g. after a DB reset).
@@ -76,7 +82,7 @@ export async function POST(req: Request) {
 
   const result = streamText({
     model,
-    system: buildCoachSystemPrompt(user ?? null),
+    system: buildCoachSystemPrompt(user ?? null, userEquipmentList, allExercises),
     messages: await convertToModelMessages(messages),
     maxOutputTokens: 2048,
 
