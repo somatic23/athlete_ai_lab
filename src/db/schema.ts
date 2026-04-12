@@ -492,6 +492,17 @@ export const trainingDaysRelations = relations(
   })
 );
 
+export const scheduledEventsRelations = relations(scheduledEvents, ({ one }) => ({
+  user: one(users, {
+    fields: [scheduledEvents.userId],
+    references: [users.id],
+  }),
+  trainingDay: one(trainingDays, {
+    fields: [scheduledEvents.trainingDayId],
+    references: [trainingDays.id],
+  }),
+}));
+
 export const planExercisesRelations = relations(planExercises, ({ one }) => ({
   trainingDay: one(trainingDays, {
     fields: [planExercises.trainingDayId],
