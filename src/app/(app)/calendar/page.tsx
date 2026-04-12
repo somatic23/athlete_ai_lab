@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { useRouter } from "next/navigation";
+import { useWorkoutStore } from "@/stores/workout-store";
 import {
   DndContext,
   DragOverlay,
@@ -277,6 +279,50 @@ function EventDetail({ event, dayColorMap, onClose, onDelete, onToggleComplete }
   onToggleComplete: (id: string, done: boolean) => void;
 }) {
   const color = getEventColor(event, dayColorMap);
+  const router = useRouter();
+  const { startWorkout } = useWorkoutStore();
+  const [starting, setStarting] = useState(false);
+  const [linkedSessionId, setLinkedSessionId] = useState<string | null | undefined>(undefined); // undefined = not loaded yet
+
+  // Load linked session when a completed training event is opened
+  useEffect(() => {
+    if (event.eventType !== "training_day" || !event.isCompleted) return;
+    fetch(`/api/workout/sessions?scheduledEventId=${event.id}`)
+      .then((r) => r.ok ? r.json() : null)
+      .then((data) => setLinkedSessionId(data?.id ?? null));
+  }, [event.id, event.eventType, event.isCompleted]);
+
+  async function handleStartWorkout() {
+    if (event.eventType !== "training_day") return;
+    setStarting(true);
+    try {
+      const res = await fetch("/api/workout/sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          title: eventLabel(event),
+          trainingDayId: event.trainingDayId,
+          scheduledEventId: event.id,
+        }),
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const exercises = (data.exercises ?? []).map((ex: any) => ({ ...ex, loggedSets: [] }));
+      startWorkout({
+        sessionId: data.id,
+        title: data.title,
+        trainingDayId: data.trainingDayId ?? null,
+        startedAt: data.startedAt,
+        exercises,
+      });
+      onClose();
+      router.push(`/workout/${data.id}`);
+    } finally {
+      setStarting(false);
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
       <div
@@ -304,6 +350,23 @@ function EventDetail({ event, dayColorMap, onClose, onDelete, onToggleComplete }
           <button onClick={onClose} className="text-on-surface-variant/50 hover:text-on-surface transition-colors">✕</button>
         </div>
         <div className="flex flex-col gap-2">
+          {event.eventType === "training_day" && !event.isCompleted && (
+            <button
+              onClick={handleStartWorkout}
+              disabled={starting}
+              className="w-full rounded-lg px-4 py-2.5 text-sm font-bold bg-primary text-on-primary hover:opacity-90 transition-all disabled:opacity-50"
+            >
+              {starting ? "Starten…" : "Training starten ▶"}
+            </button>
+          )}
+          {event.eventType === "training_day" && event.isCompleted && linkedSessionId && (
+            <button
+              onClick={() => { onClose(); router.push(`/workout/${linkedSessionId}/detail`); }}
+              className="w-full rounded-lg px-4 py-2.5 text-sm font-bold bg-secondary-container/30 text-secondary hover:bg-secondary-container/50 transition-all"
+            >
+              Training anzeigen →
+            </button>
+          )}
           <button
             onClick={() => { onToggleComplete(event.id, !event.isCompleted); onClose(); }}
             className={cn(

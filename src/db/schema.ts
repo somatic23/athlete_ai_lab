@@ -537,6 +537,17 @@ export const workoutSetsRelations = relations(workoutSets, ({ one }) => ({
   }),
 }));
 
+export const workoutExerciseSummaryRelations = relations(workoutExerciseSummary, ({ one }) => ({
+  session: one(workoutSessions, {
+    fields: [workoutExerciseSummary.sessionId],
+    references: [workoutSessions.id],
+  }),
+  exercise: one(exercises, {
+    fields: [workoutExerciseSummary.exerciseId],
+    references: [exercises.id],
+  }),
+}));
+
 export const chatConversationsRelations = relations(
   chatConversations,
   ({ one, many }) => ({
