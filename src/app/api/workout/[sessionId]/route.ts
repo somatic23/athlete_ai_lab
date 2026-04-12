@@ -60,6 +60,21 @@ export async function GET(_req: NextRequest, { params }: Params) {
   return NextResponse.json({ ...row, sets: setsWithName, aiReport });
 }
 
+// DELETE /api/workout/[sessionId]
+export async function DELETE(_req: NextRequest, { params }: Params) {
+  const session = await auth();
+  if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+  const { sessionId } = await params;
+
+  await db.delete(workoutSessions).where(and(
+    eq(workoutSessions.id, sessionId),
+    eq(workoutSessions.userId, session.user.id)
+  ));
+
+  return NextResponse.json({ ok: true });
+}
+
 // PATCH /api/workout/[sessionId] — update session-level fields
 export async function PATCH(req: NextRequest, { params }: Params) {
   const session = await auth();

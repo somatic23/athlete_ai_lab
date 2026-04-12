@@ -13,6 +13,103 @@ import {
 
 // ── Types ──────────────────────────────────────────────────────────────
 
+type ExerciseOption = {
+  id: string;
+  nameI18n: string;
+  primaryMuscleGroup: string;
+};
+
+const MUSCLE_LABELS: Record<string, string> = {
+  chest: "Brust", back: "Rücken", shoulders: "Schultern",
+  biceps: "Bizeps", triceps: "Trizeps", forearms: "Unterarme",
+  quadriceps: "Quadrizeps", hamstrings: "Hamstrings", glutes: "Gesäß",
+  calves: "Waden", core: "Core", full_body: "Ganzkörper",
+};
+
+function parseName(nameI18n: string): string {
+  try { const p = JSON.parse(nameI18n); return p.de || p.en || ""; } catch { return ""; }
+}
+
+// ── Exercise Picker Modal ─────────────────────────────────────────────
+
+function ExercisePicker({
+  onAdd,
+  onClose,
+}: {
+  onAdd: (ex: ExerciseOption) => void;
+  onClose: () => void;
+}) {
+  const [exercises, setExercises] = useState<ExerciseOption[]>([]);
+  const [query, setQuery] = useState("");
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    fetch("/api/exercises")
+      .then((r) => r.ok ? r.json() : [])
+      .then(setExercises)
+      .finally(() => setLoading(false));
+  }, []);
+
+  const filtered = exercises.filter((ex) => {
+    const name = parseName(ex.nameI18n).toLowerCase();
+    const muscle = (MUSCLE_LABELS[ex.primaryMuscleGroup] ?? "").toLowerCase();
+    const q = query.toLowerCase();
+    return name.includes(q) || muscle.includes(q);
+  });
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-surface/60 backdrop-blur-sm"
+      onClick={onClose}
+    >
+      <div
+        className="w-full sm:max-w-md rounded-t-2xl sm:rounded-2xl bg-surface-container-high flex flex-col max-h-[80vh] shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-outline-variant/10">
+          <h2 className="font-headline font-bold text-on-surface">Übung hinzufügen</h2>
+          <button onClick={onClose} className="text-on-surface-variant/50 hover:text-on-surface transition-colors">✕</button>
+        </div>
+
+        {/* Search */}
+        <div className="px-4 py-3">
+          <input
+            type="text"
+            autoFocus
+            placeholder="Suche nach Name oder Muskelgruppe…"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            className="w-full rounded-xl bg-surface-container px-4 py-2.5 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:outline-none focus:ring-1 focus:ring-primary/40"
+          />
+        </div>
+
+        {/* List */}
+        <div className="flex-1 overflow-y-auto px-4 pb-4 flex flex-col gap-1.5">
+          {loading ? (
+            <p className="text-center text-sm text-on-surface-variant/50 py-8">Laden…</p>
+          ) : filtered.length === 0 ? (
+            <p className="text-center text-sm text-on-surface-variant/50 py-8">Keine Übungen gefunden.</p>
+          ) : (
+            filtered.map((ex) => (
+              <button
+                key={ex.id}
+                onClick={() => onAdd(ex)}
+                className="w-full rounded-xl bg-surface-container px-4 py-3 text-left hover:bg-surface-container-high transition-colors flex items-center justify-between gap-3"
+              >
+                <span className="text-sm font-medium text-on-surface">{parseName(ex.nameI18n)}</span>
+                <span className="text-xs text-on-surface-variant/50 shrink-0">
+                  {MUSCLE_LABELS[ex.primaryMuscleGroup] ?? ex.primaryMuscleGroup}
+                </span>
+              </button>
+            ))
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
 type SetOutcomeOption = { value: SetOutcome; label: string; color: string };
 
 const OUTCOMES: SetOutcomeOption[] = [
@@ -405,12 +502,15 @@ export default function WorkoutPage({ params }: { params: Promise<{ sessionId: s
   const { sessionId } = use(params);
   const router = useRouter();
   const {
-    activeWorkout, startWorkout,
+    activeWorkout, startWorkout, clearWorkout, addExercise,
     restTimerSeconds, restTimerActive,
     startRestTimer, tickRestTimer, stopRestTimer,
   } = useWorkoutStore();
 
   const [loading, setLoading] = useState(false);
+  const [confirmCancel, setConfirmCancel] = useState(false);
+  const [cancelling, setCancelling] = useState(false);
+  const [showPicker, setShowPicker] = useState(false);
   const restTotalRef = useRef(0);
 
   // Restore workout from API if not in store
@@ -450,6 +550,34 @@ export default function WorkoutPage({ params }: { params: Promise<{ sessionId: s
     }
   }
 
+  function handleAddExercise(ex: ExerciseOption) {
+    addExercise({
+      planExerciseId: null,
+      exerciseId: ex.id,
+      name: parseName(ex.nameI18n),
+      targetSets: 3,
+      repsMin: 8,
+      repsMax: 12,
+      targetRpe: null,
+      restSeconds: 90,
+      suggestedWeightKg: null,
+      notes: null,
+      loggedSets: [],
+    });
+    setShowPicker(false);
+  }
+
+  async function handleCancel() {
+    setCancelling(true);
+    try {
+      await fetch(`/api/workout/${sessionId}`, { method: "DELETE" });
+      clearWorkout();
+      router.push("/workout/history");
+    } finally {
+      setCancelling(false);
+    }
+  }
+
   const workout = activeWorkout?.sessionId === sessionId ? activeWorkout : null;
 
   if (loading) {
@@ -461,7 +589,7 @@ export default function WorkoutPage({ params }: { params: Promise<{ sessionId: s
   }
 
   return (
-    <div className="flex h-full flex-col overflow-hidden">
+    <div className="relative flex h-full flex-col overflow-hidden">
       {/* ── Sticky header ── */}
       <div className="shrink-0 flex items-center justify-between gap-4 border-b border-outline-variant/10 bg-surface-container-low px-5 py-4">
         <div className="min-w-0">
@@ -477,6 +605,13 @@ export default function WorkoutPage({ params }: { params: Promise<{ sessionId: s
             {stopwatchLabel}
           </span>
           <button
+            onClick={() => setConfirmCancel(true)}
+            className="rounded-xl bg-surface-container text-on-surface-variant/60 px-3 py-2.5 text-sm font-medium hover:bg-error-container/20 hover:text-error transition-all"
+            title="Training abbrechen"
+          >
+            ✕
+          </button>
+          <button
             onClick={() => router.push(`/workout/${sessionId}/review?duration=${elapsed}`)}
             className="rounded-xl bg-secondary-container/30 text-secondary px-4 py-2.5 text-sm font-bold hover:bg-secondary-container/50 transition-all whitespace-nowrap"
           >
@@ -485,35 +620,79 @@ export default function WorkoutPage({ params }: { params: Promise<{ sessionId: s
         </div>
       </div>
 
+      {/* ── Cancel confirm overlay ── */}
+      {confirmCancel && (
+        <div
+          className="absolute inset-0 z-50 flex items-center justify-center p-6 bg-surface/70 backdrop-blur-sm"
+          onClick={() => setConfirmCancel(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl bg-surface-container-high p-6 flex flex-col gap-4 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div>
+              <h2 className="font-headline font-bold text-on-surface mb-1">Training abbrechen?</h2>
+              <p className="text-sm text-on-surface-variant">
+                Das Training wird gelöscht und nicht gespeichert. Alle bisher geloggten Sätze gehen verloren.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setConfirmCancel(false)}
+                className="flex-1 rounded-xl bg-surface-container text-on-surface-variant py-3 text-sm font-medium hover:bg-surface-container-high transition-all"
+              >
+                Weitermachen
+              </button>
+              <button
+                onClick={handleCancel}
+                disabled={cancelling}
+                className="flex-1 rounded-xl bg-error text-white py-3 text-sm font-bold hover:opacity-90 transition-all disabled:opacity-50"
+              >
+                {cancelling ? "Abbrechen…" : "Ja, abbrechen"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Exercise list ── */}
       <div className="flex-1 overflow-y-auto">
-        {!workout || workout.exercises.length === 0 ? (
+        {!workout ? (
           <div className="flex flex-col items-center justify-center gap-3 py-20 px-6 text-center">
-            <p className="text-on-surface-variant/50 text-sm">
-              {workout
-                ? "Freies Training — keine Übungen vorgeplant."
-                : "Kein aktives Training gefunden."}
-            </p>
-            {!workout && (
-              <button
-                onClick={() => router.push("/workout/history")}
-                className="text-sm text-primary hover:underline"
-              >
-                Zurück zur Historie
-              </button>
-            )}
+            <p className="text-on-surface-variant/50 text-sm">Kein aktives Training gefunden.</p>
+            <button
+              onClick={() => router.push("/workout/history")}
+              className="text-sm text-primary hover:underline"
+            >
+              Zurück zur Historie
+            </button>
           </div>
         ) : (
           <div className="flex flex-col gap-4 p-4 pb-24">
+            {workout.exercises.length === 0 && (
+              <div className="flex flex-col items-center justify-center gap-3 py-12 text-center">
+                <p className="text-on-surface-variant/50 text-sm">
+                  Noch keine Übungen. Füge deine erste Übung hinzu.
+                </p>
+              </div>
+            )}
             {workout.exercises.map((exercise, idx) => (
               <ExerciseCard
-                key={exercise.exerciseId}
+                key={`${exercise.exerciseId}-${idx}`}
                 exercise={exercise}
                 exerciseIdx={idx}
                 sessionId={sessionId}
                 onSetLogged={handleSetLogged}
               />
             ))}
+            {/* Add exercise button */}
+            <button
+              onClick={() => setShowPicker(true)}
+              className="w-full rounded-2xl border border-dashed border-outline-variant/30 py-4 text-sm text-on-surface-variant/50 hover:border-primary/40 hover:text-primary transition-all flex items-center justify-center gap-2"
+            >
+              <span className="text-lg leading-none">+</span>
+              Übung hinzufügen
+            </button>
           </div>
         )}
       </div>
@@ -524,6 +703,14 @@ export default function WorkoutPage({ params }: { params: Promise<{ sessionId: s
           seconds={restTimerSeconds}
           total={restTotalRef.current || restTimerSeconds}
           onSkip={stopRestTimer}
+        />
+      )}
+
+      {/* ── Exercise picker ── */}
+      {showPicker && (
+        <ExercisePicker
+          onAdd={handleAddExercise}
+          onClose={() => setShowPicker(false)}
         />
       )}
     </div>

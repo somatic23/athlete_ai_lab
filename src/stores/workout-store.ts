@@ -45,6 +45,7 @@ type WorkoutStore = {
   restTimerExerciseIdx: number | null;
 
   startWorkout: (workout: ActiveWorkout) => void;
+  addExercise: (exercise: WorkoutExercise) => void;
   addLoggedSet: (exerciseIdx: number, set: LoggedSet) => void;
   updateLoggedSet: (exerciseIdx: number, setLocalId: string, patch: Partial<LoggedSet>) => void;
   removeLoggedSet: (exerciseIdx: number, setLocalId: string) => void;
@@ -63,6 +64,17 @@ export const useWorkoutStore = create<WorkoutStore>()(
       restTimerExerciseIdx: null,
 
       startWorkout: (workout) => set({ activeWorkout: workout }),
+
+      addExercise: (exercise) =>
+        set((state) => {
+          if (!state.activeWorkout) return state;
+          return {
+            activeWorkout: {
+              ...state.activeWorkout,
+              exercises: [...state.activeWorkout.exercises, exercise],
+            },
+          };
+        }),
 
       addLoggedSet: (exerciseIdx, loggedSet) =>
         set((state) => {

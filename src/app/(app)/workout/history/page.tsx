@@ -160,51 +160,96 @@ function StartWorkoutModal({
 
 // ── Session Card ──────────────────────────────────────────────────────
 
-function SessionCard({ session }: { session: Session }) {
+function SessionCard({
+  session,
+  onClick,
+  onDelete,
+}: {
+  session: Session;
+  onClick: () => void;
+  onDelete: () => void;
+}) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
+
   const muscles: string[] = (() => {
     try { return JSON.parse(session.muscleGroupsTrained ?? "[]"); } catch { return []; }
   })();
 
   return (
-    <div className="rounded-xl bg-surface-container-low p-4 flex flex-col gap-2">
-      <div className="flex items-start justify-between gap-2">
-        <div className="min-w-0">
-          <p className="font-medium text-on-surface truncate">{session.title}</p>
-          <p className="text-xs text-on-surface-variant/60 font-mono mt-0.5">{fmtDate(session.startedAt)}</p>
+    <div className="relative rounded-xl bg-surface-container-low overflow-hidden">
+      {/* Main card — clickable */}
+      <button
+        onClick={onClick}
+        className="w-full p-4 flex flex-col gap-2 text-left hover:bg-surface-container transition-colors"
+      >
+        <div className="flex items-start justify-between gap-2">
+          <div className="min-w-0">
+            <p className="font-medium text-on-surface truncate">{session.title}</p>
+            <p className="text-xs text-on-surface-variant/60 font-mono mt-0.5">{fmtDate(session.startedAt)}</p>
+          </div>
+          <div className="flex items-center gap-3 shrink-0">
+            {session.satisfactionRating && (
+              <span className="text-base">
+                {["😞", "😕", "😐", "😊", "🔥"][session.satisfactionRating - 1]}
+              </span>
+            )}
+            {session.perceivedLoad && (
+              <span className={cn("text-xs font-mono", LOAD_COLOR[session.perceivedLoad])}>
+                {LOAD_LABEL[session.perceivedLoad]}
+              </span>
+            )}
+            <span className="text-on-surface-variant/30 text-sm">→</span>
+          </div>
         </div>
-        <div className="flex flex-col items-end gap-1 shrink-0">
-          {session.satisfactionRating && (
-            <span className="text-base">
-              {["😞", "😕", "😐", "😊", "🔥"][session.satisfactionRating - 1]}
-            </span>
-          )}
-          {session.perceivedLoad && (
-            <span className={cn("text-xs font-mono", LOAD_COLOR[session.perceivedLoad])}>
-              {LOAD_LABEL[session.perceivedLoad]}
-            </span>
-          )}
+
+        <div className="flex gap-4 text-xs font-mono text-on-surface-variant/70">
+          <span>{fmtDuration(session.durationSeconds)}</span>
+          {session.totalVolumeKg != null && <span>{session.totalVolumeKg.toFixed(0)} kg</span>}
+          {session.totalSets != null && <span>{session.totalSets} Sätze</span>}
         </div>
+
+        {muscles.length > 0 && (
+          <div className="flex flex-wrap gap-1">
+            {muscles.map((mg) => (
+              <span key={mg} className="rounded bg-surface-container px-1.5 py-0.5 text-xs text-on-surface-variant/60">
+                {MUSCLE_LABELS[mg] ?? mg}
+              </span>
+            ))}
+          </div>
+        )}
+
+        {!session.completedAt && (
+          <span className="text-xs text-amber-400 font-mono">● Nicht abgeschlossen</span>
+        )}
+      </button>
+
+      {/* Delete area */}
+      <div className="absolute right-0 top-0 bottom-0 flex items-center pr-3">
+        {confirmDelete ? (
+          <div className="flex items-center gap-1">
+            <button
+              onClick={(e) => { e.stopPropagation(); onDelete(); }}
+              className="rounded-lg bg-error px-3 py-1.5 text-xs font-bold text-white"
+            >
+              Löschen
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); setConfirmDelete(false); }}
+              className="rounded-lg bg-surface-container px-2 py-1.5 text-xs text-on-surface-variant"
+            >
+              Abbrechen
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={(e) => { e.stopPropagation(); setConfirmDelete(true); }}
+            className="flex h-8 w-8 items-center justify-center rounded-lg text-on-surface-variant/25 hover:text-error hover:bg-error-container/20 transition-all"
+            title="Training löschen"
+          >
+            🗑
+          </button>
+        )}
       </div>
-
-      <div className="flex gap-4 text-xs font-mono text-on-surface-variant/70">
-        <span>{fmtDuration(session.durationSeconds)}</span>
-        {session.totalVolumeKg != null && <span>{session.totalVolumeKg.toFixed(0)} kg</span>}
-        {session.totalSets != null && <span>{session.totalSets} Sätze</span>}
-      </div>
-
-      {muscles.length > 0 && (
-        <div className="flex flex-wrap gap-1">
-          {muscles.map((mg) => (
-            <span key={mg} className="rounded bg-surface-container px-1.5 py-0.5 text-xs text-on-surface-variant/60">
-              {MUSCLE_LABELS[mg] ?? mg}
-            </span>
-          ))}
-        </div>
-      )}
-
-      {!session.completedAt && (
-        <span className="text-xs text-amber-400 font-mono">● Nicht abgeschlossen</span>
-      )}
     </div>
   );
 }
@@ -304,7 +349,17 @@ export default function WorkoutHistoryPage() {
             </button>
           </div>
         ) : (
-          sessions.map((s) => <SessionCard key={s.id} session={s} />)
+          sessions.map((s) => (
+            <SessionCard
+              key={s.id}
+              session={s}
+              onClick={() => router.push(`/workout/${s.id}/detail`)}
+              onDelete={async () => {
+                await fetch(`/api/workout/${s.id}`, { method: "DELETE" });
+                setSessions((prev) => prev.filter((x) => x.id !== s.id));
+              }}
+            />
+          ))
         )}
       </div>
 
