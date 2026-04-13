@@ -1,9 +1,11 @@
 "use client";
 
 import { usePathname } from "next/navigation";
+import { useEffect } from "react";
 import Link from "next/link";
 import { signOut } from "next-auth/react";
 import { cn } from "@/lib/utils/cn";
+import { useLocaleStore } from "@/stores/locale-store";
 
 const NAV_ITEMS = [
   { href: "/coach",           label: "AI Coach",        icon: "◈" },
@@ -15,6 +17,15 @@ const NAV_ITEMS = [
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const setLocale = useLocaleStore((s) => s.setLocale);
+
+  // Sync locale from user profile once on mount
+  useEffect(() => {
+    fetch("/api/profile")
+      .then((r) => r.json())
+      .then((p) => { if (p.preferredLocale) setLocale(p.preferredLocale); })
+      .catch(() => {});
+  }, [setLocale]);
 
   return (
     <div className="flex h-screen overflow-hidden bg-surface">

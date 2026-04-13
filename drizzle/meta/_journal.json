@@ -15,6 +15,20 @@
       "when": 1744358400000,
       "tag": "0001_add_birth_date",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1744444800000,
+      "tag": "0002_equipment_category",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1744531200000,
+      "tag": "0003_user_locale",
+      "breakpoints": true
     }
   ]
 }

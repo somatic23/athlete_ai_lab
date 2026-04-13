@@ -8,6 +8,11 @@ import { z } from "zod";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils/cn";
+import {
+  EQUIPMENT_CATEGORIES,
+  EQUIPMENT_CATEGORY_LABELS,
+  type EquipmentCategory,
+} from "@/lib/equipment-categories";
 
 const schema = z.object({
   birthDate: z.string().optional(),
@@ -25,7 +30,7 @@ const schema = z.object({
 
 type FormData = z.infer<typeof schema>;
 
-type Equipment = { id: string; name: string; description: string | null };
+type Equipment = { id: string; name: string; description: string | null; category: EquipmentCategory | null };
 
 const STEPS = [
   { id: 1, label: "Persoenlich", title: "Persoenliche Daten" },
@@ -303,32 +308,75 @@ export default function OnboardingPage() {
 
           {/* Step 2: Equipment */}
           {step === 2 && (
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-4">
               {equipment.length === 0 ? (
                 <p className="text-sm text-on-surface-variant">
-                  Kein Equipment gefunden. Du kannst dies spaeter in den Einstellungen aendern.
+                  Kein Equipment gefunden. Du kannst dies später in den Einstellungen ändern.
                 </p>
               ) : (
-                <div className="grid grid-cols-2 gap-2">
-                  {equipment.map((eq) => (
-                    <button
-                      key={eq.id}
-                      type="button"
-                      onClick={() => toggleEquipment(eq.id)}
-                      className={cn(
-                        "rounded-md px-3 py-2.5 text-left text-sm transition-all",
-                        selectedEquipment.includes(eq.id)
-                          ? "bg-primary-container text-on-primary"
-                          : "bg-surface-container-high text-on-surface hover:bg-surface-container-highest"
-                      )}
-                    >
-                      {eq.name}
-                    </button>
-                  ))}
+                <div className="flex flex-col gap-5">
+                  {/* Categorized groups */}
+                  {EQUIPMENT_CATEGORIES.map((cat) => {
+                    const group = equipment.filter((e) => e.category === cat);
+                    if (group.length === 0) return null;
+                    return (
+                      <div key={cat}>
+                        <p className="mb-2 text-xs font-mono uppercase tracking-wider text-on-surface-variant/60">
+                          {EQUIPMENT_CATEGORY_LABELS[cat].de}
+                        </p>
+                        <div className="grid grid-cols-2 gap-2">
+                          {group.map((eq) => (
+                            <button
+                              key={eq.id}
+                              type="button"
+                              onClick={() => toggleEquipment(eq.id)}
+                              className={cn(
+                                "rounded-md px-3 py-2.5 text-left text-sm transition-all",
+                                selectedEquipment.includes(eq.id)
+                                  ? "bg-primary-container text-on-primary"
+                                  : "bg-surface-container-high text-on-surface hover:bg-surface-container-highest"
+                              )}
+                            >
+                              {eq.name}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {/* Uncategorized fallback */}
+                  {(() => {
+                    const uncategorized = equipment.filter((e) => !e.category);
+                    if (uncategorized.length === 0) return null;
+                    return (
+                      <div>
+                        <p className="mb-2 text-xs font-mono uppercase tracking-wider text-on-surface-variant/60">
+                          Sonstiges
+                        </p>
+                        <div className="grid grid-cols-2 gap-2">
+                          {uncategorized.map((eq) => (
+                            <button
+                              key={eq.id}
+                              type="button"
+                              onClick={() => toggleEquipment(eq.id)}
+                              className={cn(
+                                "rounded-md px-3 py-2.5 text-left text-sm transition-all",
+                                selectedEquipment.includes(eq.id)
+                                  ? "bg-primary-container text-on-primary"
+                                  : "bg-surface-container-high text-on-surface hover:bg-surface-container-highest"
+                              )}
+                            >
+                              {eq.name}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
-              <p className="mt-2 text-xs text-on-surface-variant">
-                {selectedEquipment.length} ausgewaehlt
+              <p className="text-xs text-on-surface-variant">
+                {selectedEquipment.length} ausgewählt
               </p>
             </div>
           )}

@@ -18,6 +18,7 @@ export async function GET(req: NextRequest) {
       name: getLocalized(e.nameI18n, locale),
       description: getLocalized(e.descriptionI18n, locale) || null,
       imageUrl: e.imageUrl,
+      category: e.category,
     }))
     .sort((a, b) => a.name.localeCompare(b.name, locale));
 

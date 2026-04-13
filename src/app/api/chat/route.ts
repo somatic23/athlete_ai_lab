@@ -42,6 +42,8 @@ export async function POST(req: Request) {
 
   const userEquipmentList = userEquipmentRows.map((r) => r.eq);
 
+  const userLocale = (user?.preferredLocale ?? "de") as "de" | "en";
+
   await logger.info("chat.request", {
     userId,
     metadata: {
@@ -49,7 +51,7 @@ export async function POST(req: Request) {
       model: activeProvider?.modelId ?? "unknown",
       messageCount: messages?.length ?? 0,
       lastUserMessage: lastUserMessage.slice(0, 200),
-      systemPrompt: buildCoachSystemPrompt(user ?? null, userEquipmentList, allExercises),
+      locale: userLocale,
     },
   });
 
@@ -82,7 +84,7 @@ export async function POST(req: Request) {
 
   const result = streamText({
     model,
-    system: buildCoachSystemPrompt(user ?? null, userEquipmentList, allExercises),
+    system: buildCoachSystemPrompt(user ?? null, userEquipmentList, allExercises, userLocale),
     messages: await convertToModelMessages(messages),
     maxOutputTokens: 2048,
 

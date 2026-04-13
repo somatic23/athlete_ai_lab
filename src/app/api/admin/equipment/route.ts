@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth/config";
 import { db } from "@/db";
-import { equipment } from "@/db/schema";
+import { equipment, EQUIPMENT_CATEGORIES } from "@/db/schema";
 import { z } from "zod";
 import { randomUUID } from "crypto";
 import { parseI18n, stringifyI18n } from "@/lib/utils/i18n";
@@ -13,6 +13,7 @@ const schema = z.object({
   name: i18nField,
   description: i18nOptional,
   imageUrl: z.string().optional(),
+  category: z.enum(EQUIPMENT_CATEGORIES).nullable().optional(),
   isActive: z.boolean().optional().default(true),
 });
 
@@ -57,7 +58,7 @@ export async function POST(req: NextRequest) {
     .returning();
 
   return NextResponse.json(
-    { ...item[0], name: parseI18n(item[0].nameI18n), description: parseI18n(item[0].descriptionI18n) },
+    { ...item[0], name: parseI18n(item[0].nameI18n), description: parseI18n(item[0].descriptionI18n), category: item[0].category },
     { status: 201 }
   );
 }

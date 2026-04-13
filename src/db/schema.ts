@@ -1,5 +1,10 @@
 import { sqliteTable, text, integer, real } from "drizzle-orm/sqlite-core";
 import { relations } from "drizzle-orm";
+import {
+  EQUIPMENT_CATEGORIES,
+  EQUIPMENT_CATEGORY_LABELS,
+  type EquipmentCategory,
+} from "@/lib/equipment-categories";
 
 // =============================================
 // CORE TABLES
@@ -21,6 +26,7 @@ export const users = sqliteTable("users", {
     enum: ["beginner", "intermediate", "advanced", "expert"],
   }),
   injuriesLimitations: text("injuries_limitations"),
+  preferredLocale: text("preferred_locale").$type<"de" | "en">().notNull().default("de"),
   onboardingCompleted: integer("onboarding_completed", { mode: "boolean" })
     .notNull()
     .default(false),
@@ -32,11 +38,20 @@ export const users = sqliteTable("users", {
     .$defaultFn(() => new Date().toISOString()),
 });
 
+// Re-export for server-side code that imports from schema
+export { EQUIPMENT_CATEGORIES, EQUIPMENT_CATEGORY_LABELS, type EquipmentCategory };
+
+/** @deprecated Use EQUIPMENT_CATEGORY_LABELS[cat].de instead */
+export const EQUIPMENT_CATEGORY_LABELS_DE: Record<EquipmentCategory, string> = Object.fromEntries(
+  Object.entries(EQUIPMENT_CATEGORY_LABELS).map(([k, v]) => [k, v.de])
+) as Record<EquipmentCategory, string>;
+
 export const equipment = sqliteTable("equipment", {
   id: text("id").primaryKey(),
   nameI18n: text("name_i18n").notNull(), // JSON: { de: string; en: string }
   descriptionI18n: text("description_i18n"), // JSON: { de: string; en: string }
   imageUrl: text("image_url"),
+  category: text("category").$type<EquipmentCategory>(),
   isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
   createdAt: text("created_at")
     .notNull()

@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils/cn";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { calculateAge } from "@/lib/utils/age";
+import { useLocaleStore, type AppLocale } from "@/stores/locale-store";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -20,6 +21,7 @@ type Profile = {
   experienceLevel: "beginner" | "intermediate" | "advanced" | "expert" | null;
   goals: string | null;
   injuriesLimitations: string | null;
+  preferredLocale: AppLocale;
   equipmentIds: string[];
 };
 
@@ -83,10 +85,24 @@ function SaveBar({
 
 // ── Main page ──────────────────────────────────────────────────────────
 
+const LANGUAGE_OPTIONS: { value: AppLocale; labelDe: string; labelNative: string; flag: string }[] = [
+  { value: "de", labelDe: "Deutsch", labelNative: "Deutsch", flag: "🇩🇪" },
+  { value: "en", labelDe: "Englisch", labelNative: "English", flag: "🇬🇧" },
+];
+
 export default function SettingsPage() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [catalog, setCatalog] = useState<EquipmentItem[]>([]);
   const [loading, setLoading] = useState(true);
+
+  const { locale: storeLocale, setLocale: setStoreLocale } = useLocaleStore();
+
+  // Language section state
+  const [selectedLocale, setSelectedLocale] = useState<AppLocale>("de");
+  const [localeDirty, setLocaleDirty] = useState(false);
+  const [localeSaving, setLocaleSaving] = useState(false);
+  const [localeError, setLocaleError] = useState<string | null>(null);
+  const [localeSuccess, setLocaleSuccess] = useState(false);
 
   // Per-section local state
   const [account, setAccount] = useState({ displayName: "", email: "" });
@@ -125,13 +141,14 @@ export default function SettingsPage() {
   const loadProfile = useCallback(async () => {
     const [profileRes, catalogRes] = await Promise.all([
       fetch("/api/profile"),
-      fetch("/api/equipment?locale=de"),
+      fetch(`/api/equipment?locale=${storeLocale}`),
     ]);
     const p: Profile = await profileRes.json();
     const c: EquipmentItem[] = await catalogRes.json();
 
     setProfile(p);
     setCatalog(c);
+    setSelectedLocale(p.preferredLocale ?? "de");
     setAccount({ displayName: p.displayName, email: p.email });
     setBody({
       birthDate: p.birthDate ?? "",
@@ -277,6 +294,42 @@ export default function SettingsPage() {
     setEquipmentSaving(false);
   }
 
+  // ── Language section ─────────────────────────────────────────────────
+
+  function handleLocaleChange(l: AppLocale) {
+    setSelectedLocale(l);
+    setLocaleDirty(l !== (profile?.preferredLocale ?? "de"));
+    setLocaleSuccess(false);
+    setLocaleError(null);
+  }
+
+  function resetLocale() {
+    setSelectedLocale(profile?.preferredLocale ?? "de");
+    setLocaleDirty(false);
+    setLocaleError(null);
+    setLocaleSuccess(false);
+  }
+
+  async function saveLocale() {
+    setLocaleSaving(true);
+    setLocaleError(null);
+    const res = await fetch("/api/profile", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ preferredLocale: selectedLocale }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      setLocaleError(data.error ?? "Fehler beim Speichern");
+    } else {
+      setLocaleDirty(false);
+      setLocaleSuccess(true);
+      setStoreLocale(selectedLocale); // update UI immediately
+      setProfile((p) => p ? { ...p, preferredLocale: selectedLocale } : p);
+    }
+    setLocaleSaving(false);
+  }
+
   // ── Password section ─────────────────────────────────────────────────
 
   async function savePassword() {
@@ -323,6 +376,55 @@ export default function SettingsPage() {
           <h1 className="font-headline text-2xl font-bold text-on-surface">Einstellungen</h1>
           <p className="text-sm text-on-surface-variant mt-1">Athleten-Profil und Konto verwalten</p>
         </div>
+
+        {/* ── Sprache ── */}
+        <section>
+          <SectionTitle>Sprache / Language</SectionTitle>
+          <div className="rounded-xl bg-surface-container p-5">
+            <p className="text-xs text-on-surface-variant mb-4">
+              Steuert die Anzeigesprache und die Antwortsprache des AI Coaches.
+              <br />
+              <span className="opacity-60">Controls the display language and the AI coach response language.</span>
+            </p>
+            <div className="flex gap-3">
+              {LANGUAGE_OPTIONS.map((opt) => (
+                <button
+                  key={opt.value}
+                  type="button"
+                  onClick={() => handleLocaleChange(opt.value)}
+                  className={cn(
+                    "flex flex-1 items-center gap-3 rounded-xl border-2 px-4 py-3 text-left transition-all",
+                    selectedLocale === opt.value
+                      ? "border-primary bg-primary-container/15 text-on-surface"
+                      : "border-transparent bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest"
+                  )}
+                >
+                  <span className="text-2xl">{opt.flag}</span>
+                  <div>
+                    <p className="text-sm font-semibold">{opt.labelNative}</p>
+                    <p className="text-xs opacity-60">{opt.labelDe}</p>
+                  </div>
+                  {selectedLocale === opt.value && (
+                    <span className="ml-auto text-primary text-sm font-bold">✓</span>
+                  )}
+                </button>
+              ))}
+            </div>
+            {storeLocale !== selectedLocale && !localeDirty && (
+              <p className="mt-3 text-xs text-on-surface-variant/50 font-mono">
+                Aktiv: {storeLocale.toUpperCase()} · Ausstehend: {selectedLocale.toUpperCase()}
+              </p>
+            )}
+          </div>
+          <SaveBar
+            dirty={localeDirty}
+            saving={localeSaving}
+            error={localeError}
+            success={localeSuccess}
+            onSave={saveLocale}
+            onReset={resetLocale}
+          />
+        </section>
 
         {/* ── Anmeldedaten ── */}
         <section>

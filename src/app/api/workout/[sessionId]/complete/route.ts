@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth/config";
 import { db } from "@/db";
 import {
-  workoutSessions, workoutSets, workoutExerciseSummary,
+  users, workoutSessions, workoutSets, workoutExerciseSummary,
   muscleGroupLoadLog, aiAnalysisReports, scheduledEvents,
 } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
@@ -11,6 +11,7 @@ import { z } from "zod";
 import { estimated1rm } from "@/lib/utils/1rm";
 import { parseI18n } from "@/lib/utils/i18n";
 import { getDefaultModel } from "@/lib/ai/provider-registry";
+import { buildAnalysisSystemPrompt, buildAnalysisUserPrompt } from "@/lib/ai/system-prompts";
 import { generateObject, generateText } from "ai";
 
 type Params = { params: Promise<{ sessionId: string }> };
@@ -34,11 +35,6 @@ const analysisSchema = z.object({
 
 type Analysis = z.infer<typeof analysisSchema>;
 
-const LOAD_LABELS: Record<string, string> = {
-  light: "leicht", moderate: "moderat", heavy: "schwer",
-  very_heavy: "sehr schwer", maximal: "maximal",
-};
-
 // POST /api/workout/[sessionId]/complete
 export async function POST(req: NextRequest, { params }: Params) {
   const session = await auth();
@@ -54,6 +50,12 @@ export async function POST(req: NextRequest, { params }: Params) {
   });
   if (!workoutSession) return NextResponse.json({ error: "Not found" }, { status: 404 });
   if (workoutSession.completedAt) return NextResponse.json({ error: "Already completed" }, { status: 409 });
+
+  const userRow = await db.query.users.findFirst({
+    where: eq(users.id, session.user.id),
+    columns: { preferredLocale: true },
+  });
+  const locale = (userRow?.preferredLocale ?? "de") as "de" | "en";
 
   const body = await req.json();
   const parsed = completeSchema.safeParse(body);
@@ -83,7 +85,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       const names = parseI18n(s.exercise?.nameI18n ?? "{}");
       exerciseMap.set(s.exerciseId, {
         exerciseId: s.exerciseId,
-        name: names.de || names.en || "Übung",
+        name: (locale === "en" ? names.en : names.de) || names.de || names.en || "Exercise",
         primaryMuscle: s.exercise?.primaryMuscleGroup ?? "full_body",
         sets: [],
       });
@@ -212,23 +214,21 @@ export async function POST(req: NextRequest, { params }: Params) {
       return line;
     }).join("\n");
 
-    const systemPrompt = `Du bist Atlas, ein wissenschaftlich fundierter Krafttraining-Coach.
-Analysiere die Trainingseinheit und liefere strukturiertes Feedback auf Deutsch. Sei präzise und umsetzbar.
-Antworte NUR mit einem JSON-Objekt.`;
-
-    const userPrompt = `TRAINING: ${workoutSession.title}
-Dauer: ${Math.round(durationSeconds / 60)} min | Volumen: ${totalVolumeKg.toFixed(1)} kg | Sätze: ${totalSets} | Wdh: ${totalReps}
-${sessionRpeAvg != null ? `⌀ RPE: ${sessionRpeAvg.toFixed(1)}` : ""}
-${perceivedLoad ? `Belastung: ${LOAD_LABELS[perceivedLoad]}` : ""}
-${satisfactionRating ? `Zufriedenheit: ${satisfactionRating}/5` : ""}
-${feedbackText ? `Feedback: ${feedbackText}` : ""}
-
-Muskelgruppen: ${muscleGroupsTrained.join(", ")}
-
-Übungen:
-${exerciseContext}
-
-Erstelle eine Analyse mit highlights, warnings, recommendations, plateauDetectedExercises, overloadDetectedMuscles, recoveryEstimates (Muskel→Stunden), nextSessionSuggestions.`;
+    const systemPrompt = buildAnalysisSystemPrompt(locale);
+    const userPrompt = buildAnalysisUserPrompt(
+      workoutSession.title,
+      durationSeconds,
+      totalVolumeKg,
+      totalSets,
+      totalReps,
+      sessionRpeAvg,
+      perceivedLoad,
+      satisfactionRating,
+      feedbackText,
+      muscleGroupsTrained,
+      exerciseContext,
+      locale
+    );
 
     const result = await generateObject({
       model,
