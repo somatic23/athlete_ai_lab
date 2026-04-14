@@ -123,7 +123,7 @@ export default function OnboardingPage() {
   };
 
   return (
-    <div className="min-h-screen bg-surface flex flex-col items-center justify-center p-4">
+    <div className=" bg-surface flex flex-col items-center justify-center p-4">
       <div className="w-full max-w-lg">
 
         {/* ── Success screen ── */}
