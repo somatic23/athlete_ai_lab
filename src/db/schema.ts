@@ -164,6 +164,7 @@ export const trainingDays = sqliteTable("training_days", {
   focus: text("focus"),
   estimatedDurationMin: integer("estimated_duration_min"),
   sortOrder: integer("sort_order").notNull().default(0),
+  pendingAiSuggestion: text("pending_ai_suggestion"),
   createdAt: text("created_at")
     .notNull()
     .$defaultFn(() => new Date().toISOString()),

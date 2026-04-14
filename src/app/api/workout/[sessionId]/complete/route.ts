@@ -13,6 +13,8 @@ import { parseI18n } from "@/lib/utils/i18n";
 import { getDefaultModel } from "@/lib/ai/provider-registry";
 import { buildAnalysisSystemPrompt, buildAnalysisUserPrompt } from "@/lib/ai/system-prompts";
 import { generateObject, generateText } from "ai";
+import { logger } from "@/lib/utils/logger";
+import { extractJsonObject } from "@/lib/utils/extract-json";
 
 type Params = { params: Promise<{ sessionId: string }> };
 
@@ -230,24 +232,65 @@ export async function POST(req: NextRequest, { params }: Params) {
       locale
     );
 
-    const result = await generateObject({
-      model,
-      schema: analysisSchema,
-      system: systemPrompt,
-      prompt: userPrompt,
-    }).catch(async () => {
-      const text = await generateText({ model, system: systemPrompt, prompt: userPrompt });
-      const m = text.text.match(/\{[\s\S]*\}/);
-      if (m) {
-        const p = analysisSchema.safeParse(JSON.parse(m[0]));
-        if (p.success) return { object: p.data };
-      }
-      return null;
+    await logger.info("ai_analysis:post_workout:prompt", {
+      userId: session.user.id,
+      metadata: { sessionId, system: systemPrompt, prompt: userPrompt },
     });
+
+    let result: { object: Analysis } | null = null;
+    try {
+      result = await generateObject({ model, schema: analysisSchema, mode: "json", system: systemPrompt, prompt: userPrompt });
+    } catch (genObjErr) {
+      await logger.warn("ai_analysis:post_workout:generateObject_failed", {
+        userId: session.user.id,
+        metadata: { sessionId, error: String(genObjErr) },
+      });
+      try {
+        const textResult = await generateText({ model, system: systemPrompt, prompt: userPrompt });
+        const rawText = textResult.text;
+        await logger.info("ai_analysis:post_workout:generateText_raw", {
+          userId: session.user.id,
+          metadata: { sessionId, rawText: rawText.slice(0, 2000) },
+        });
+        const jsonObj = extractJsonObject(rawText);
+        if (jsonObj) {
+          const lenient = z.object({
+            highlights:               z.array(z.string()).optional().default([]),
+            warnings:                 z.array(z.string()).optional().default([]),
+            recommendations:          z.array(z.string()).optional().default([]),
+            plateauDetectedExercises: z.array(z.string()).optional().default([]),
+            overloadDetectedMuscles:  z.array(z.string()).optional().default([]),
+            recoveryEstimates:        z.record(z.string(), z.number()).optional().default({}),
+            nextSessionSuggestions:   z.array(z.string()).optional().default([]),
+          });
+          const p = lenient.safeParse(jsonObj);
+          if (p.success) result = { object: p.data as Analysis };
+          else await logger.warn("ai_analysis:post_workout:schema_mismatch", {
+            userId: session.user.id,
+            metadata: { sessionId, issues: p.error.issues.map((i) => i.message) },
+          });
+        } else {
+          await logger.warn("ai_analysis:post_workout:no_json_in_response", {
+            userId: session.user.id,
+            metadata: { sessionId, rawText: rawText.slice(0, 500) },
+          });
+        }
+      } catch (fallbackErr) {
+        await logger.error("ai_analysis:post_workout:fallback_failed", {
+          userId: session.user.id,
+          metadata: { sessionId, error: String(fallbackErr) },
+        });
+      }
+    }
 
     if (result) aiAnalysis = result.object;
 
     if (aiAnalysis) {
+      await logger.info("ai_analysis:post_workout:response", {
+        userId: session.user.id,
+        metadata: { sessionId, response: aiAnalysis },
+      });
+
       await db.insert(aiAnalysisReports).values({
         id: randomUUID(),
         sessionId,
@@ -265,6 +308,10 @@ export async function POST(req: NextRequest, { params }: Params) {
     }
   } catch (err) {
     console.error("AI analysis failed:", err);
+    await logger.error("ai_analysis:post_workout:failed", {
+      userId: session.user.id,
+      metadata: { sessionId, error: String(err) },
+    });
   }
 
   return NextResponse.json({

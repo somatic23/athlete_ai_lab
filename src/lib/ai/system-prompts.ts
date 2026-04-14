@@ -266,6 +266,89 @@ ${exerciseContext}
 Erstelle eine Analyse mit highlights, warnings, recommendations, plateauDetectedExercises, overloadDetectedMuscles, recoveryEstimates (Muskel→Stunden), nextSessionSuggestions.`;
 }
 
+// ── Weekly / Monthly analysis prompts ────────────────────────────────
+
+export function buildPeriodAnalysisSystemPrompt(
+  type: "weekly" | "monthly",
+  locale: Locale = "de"
+): string {
+  if (locale === "en") {
+    const period = type === "weekly" ? "week" : "month";
+    return `You are Atlas, a science-based strength training coach.
+Analyze the athlete's training data for the past ${period} and provide a structured summary.
+Focus on: total load, muscle group balance, progression trends, recovery risks, and actionable recommendations for next ${period}.
+Respond ONLY with a JSON object.`;
+  }
+  const period = type === "weekly" ? "Woche" : "Monat";
+  return `Du bist Atlas, ein wissenschaftlich fundierter Krafttraining-Coach.
+Analysiere die Trainingsdaten des Athleten für die vergangene ${period} und liefere eine strukturierte Zusammenfassung.
+Fokus: Gesamtbelastung, Muskelgruppen-Balance, Progressionstrends, Recovery-Risiken, umsetzbare Empfehlungen für die nächste ${period}.
+Antworte NUR mit einem JSON-Objekt.`;
+}
+
+type SessionSummaryForPrompt = {
+  title: string;
+  date: string;
+  durationMin: number;
+  totalVolumeKg: number;
+  totalSets: number;
+  perceivedLoad: string | null;
+  satisfactionRating: number | null;
+  muscleGroups: string[];
+  exercises: { name: string; volumeKg: number; maxWeightKg: number; estimated1rm: number | null }[];
+};
+
+export function buildPeriodAnalysisUserPrompt(
+  type: "weekly" | "monthly",
+  sessions: SessionSummaryForPrompt[],
+  muscleVolumeMap: Record<string, number>,
+  existingWarnings: string[],
+  locale: Locale = "de"
+): string {
+  const totalVol = sessions.reduce((a, s) => a + s.totalVolumeKg, 0);
+  const totalSets = sessions.reduce((a, s) => a + s.totalSets, 0);
+
+  const sessionLines = sessions.map((s) => {
+    const ex = s.exercises.map((e) =>
+      `    • ${e.name}: ${e.volumeKg.toFixed(0)} kg vol${e.estimated1rm ? `, est. 1RM ${e.estimated1rm.toFixed(1)} kg` : ""}`
+    ).join("\n");
+    return `  ${s.date} — ${s.title} (${s.durationMin} min, ${s.totalVolumeKg.toFixed(0)} kg)\n${ex}`;
+  }).join("\n");
+
+  const muscleLines = Object.entries(muscleVolumeMap)
+    .sort((a, b) => b[1] - a[1])
+    .map(([m, v]) => `  ${m}: ${v.toFixed(0)} kg`)
+    .join("\n");
+
+  if (locale === "en") {
+    const period = type === "weekly" ? "Weekly" : "Monthly";
+    return `${period.toUpperCase()} TRAINING SUMMARY
+Sessions: ${sessions.length} | Total Volume: ${totalVol.toFixed(0)} kg | Total Sets: ${totalSets}
+
+SESSIONS
+${sessionLines || "  (none)"}
+
+VOLUME BY MUSCLE GROUP
+${muscleLines || "  (none)"}
+
+${existingWarnings.length > 0 ? `ACTIVE WARNINGS FROM POST-WORKOUT ANALYSES\n${existingWarnings.map((w) => `  ⚠ ${w}`).join("\n")}\n` : ""}
+Generate an analysis with highlights, warnings, recommendations, plateauDetectedExercises, overloadDetectedMuscles, recoveryEstimates (muscle→hours), nextSessionSuggestions.`;
+  }
+
+  const period = type === "weekly" ? "Wochenanalyse" : "Monatsanalyse";
+  return `${period.toUpperCase()}
+Einheiten: ${sessions.length} | Gesamtvolumen: ${totalVol.toFixed(0)} kg | Gesamtsätze: ${totalSets}
+
+EINHEITEN
+${sessionLines || "  (keine)"}
+
+VOLUMEN NACH MUSKELGRUPPE
+${muscleLines || "  (keine)"}
+
+${existingWarnings.length > 0 ? `AKTIVE WARNUNGEN AUS POST-WORKOUT-ANALYSEN\n${existingWarnings.map((w) => `  ⚠ ${w}`).join("\n")}\n` : ""}
+Erstelle eine Analyse mit highlights, warnings, recommendations, plateauDetectedExercises, overloadDetectedMuscles, recoveryEstimates (Muskel→Stunden), nextSessionSuggestions.`;
+}
+
 /**
  * Final user message appended to the chat history to trigger JSON output.
  * Used when the user clicks "Plan generieren" after chatting with Atlas.

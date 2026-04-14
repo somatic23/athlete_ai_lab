@@ -202,7 +202,13 @@ function ReportCard({ report }: { report: AIReport }) {
       >
         <div>
           <p className="text-xs font-mono uppercase text-on-surface-variant/60">
-            {report.analysisType === "post_workout" ? "Post-Workout" : report.analysisType}
+            {report.analysisType === "post_workout"
+              ? "Post-Workout"
+              : report.analysisType === "weekly"
+              ? "Wochenanalyse"
+              : report.analysisType === "monthly"
+              ? "Monatsanalyse"
+              : report.analysisType}
           </p>
           <p className="text-sm font-medium text-on-surface mt-0.5">{fmtDate(report.createdAt)}</p>
         </div>
@@ -312,6 +318,10 @@ export default function RecordsPage() {
   const [overviewLoading, setOverviewLoading] = useState(false);
   const [overviewLoaded, setOverviewLoaded] = useState(false);
 
+  // Generate analysis
+  const [generating, setGenerating] = useState<"weekly" | "monthly" | null>(null);
+  const [generateError, setGenerateError] = useState<string | null>(null);
+
   // Load PRs on mount
   useEffect(() => {
     fetch(`/api/records?locale=${locale}`)
@@ -363,6 +373,41 @@ export default function RecordsPage() {
     }
     return Array.from(keys);
   }, [volumeByWeek]);
+
+  async function triggerAnalysis(type: "weekly" | "monthly") {
+    setGenerating(type);
+    setGenerateError(null);
+    // Ensure overview is loaded so we can prepend
+    if (!overviewLoaded) {
+      const d = await fetch(`/api/analytics/overview?locale=${locale}&weeks=8`).then((r) => r.json());
+      setVolumeByWeek(d.volumeByWeek ?? []);
+      setRecovery(d.recovery ?? []);
+      setAiReports(d.reports ?? []);
+      setOverviewLoaded(true);
+    }
+    try {
+      const res = await fetch("/api/analytics/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ type }),
+      });
+      const text = await res.text();
+      let data: Record<string, unknown> = {};
+      try { data = JSON.parse(text); } catch {
+        setGenerateError("Server-Fehler. Prüfe die AI-Provider-Konfiguration.");
+        setGenerating(null);
+        return;
+      }
+      if (!res.ok) {
+        setGenerateError((data.error as string) ?? "Fehler beim Generieren");
+      } else {
+        setAiReports((prev) => [data as unknown as AIReport, ...prev]);
+      }
+    } catch {
+      setGenerateError("Verbindungsfehler.");
+    }
+    setGenerating(null);
+  }
 
   // Active AI warnings across all reports (deduplicated)
   const activeWarnings = useMemo(() => {
@@ -720,12 +765,54 @@ export default function RecordsPage() {
         {/* ── Tab: KI-Analyse ────────────────────────────────────────── */}
         {tab === "ai" && (
           <div className="flex flex-col gap-5">
+
+            {/* Trigger buttons */}
+            <div className="flex flex-col gap-3">
+              <p className="text-xs font-mono uppercase tracking-widest text-on-surface-variant/60">
+                Analyse manuell starten
+              </p>
+              <div className="flex gap-3">
+                {(["weekly", "monthly"] as const).map((type) => {
+                  const isActive = generating === type;
+                  const label = type === "weekly"
+                    ? (locale === "en" ? "Weekly Analysis" : "Wochenanalyse")
+                    : (locale === "en" ? "Monthly Analysis" : "Monatsanalyse");
+                  const period = type === "weekly"
+                    ? (locale === "en" ? "Last 7 days" : "Letzte 7 Tage")
+                    : (locale === "en" ? "Last 30 days" : "Letzte 30 Tage");
+                  return (
+                    <button
+                      key={type}
+                      onClick={() => triggerAnalysis(type)}
+                      disabled={generating !== null}
+                      className={cn(
+                        "flex-1 rounded-xl border-2 p-4 text-left transition-all",
+                        isActive
+                          ? "border-primary bg-primary/5 animate-pulse cursor-wait"
+                          : generating !== null
+                          ? "border-transparent bg-surface-container-low opacity-40 cursor-not-allowed"
+                          : "border-transparent bg-surface-container-low hover:border-primary/30 hover:bg-surface-container"
+                      )}
+                    >
+                      <p className="text-sm font-semibold text-on-surface">
+                        {isActive ? (locale === "en" ? "Generating…" : "Generiere…") : label}
+                      </p>
+                      <p className="text-xs text-on-surface-variant/50 mt-0.5 font-mono">{period}</p>
+                    </button>
+                  );
+                })}
+              </div>
+              {generateError && (
+                <p className="text-xs text-error rounded-lg bg-error/10 px-3 py-2">{generateError}</p>
+              )}
+            </div>
+
             {overviewLoading ? (
               <p className="text-sm text-on-surface-variant/50 text-center py-10">Laden…</p>
             ) : aiReports.length === 0 ? (
-              <div className="text-center py-16">
+              <div className="text-center py-8">
                 <p className="text-on-surface-variant/50 text-sm">Noch keine KI-Analysen vorhanden.</p>
-                <p className="text-xs text-on-surface-variant/30 mt-2">Schließe ein Training ab um eine Analyse zu erhalten.</p>
+                <p className="text-xs text-on-surface-variant/30 mt-2">Training abschließen oder Analyse oben starten.</p>
               </div>
             ) : (
               <>
@@ -733,7 +820,7 @@ export default function RecordsPage() {
                 {activeWarnings.length > 0 && (
                   <div className="rounded-xl bg-error/5 border border-error/20 p-4">
                     <p className="text-xs font-mono uppercase tracking-widest text-error mb-3">
-                      Aktive Warnungen
+                      {locale === "en" ? "Active Warnings" : "Aktive Warnungen"}
                     </p>
                     <ul className="flex flex-col gap-2">
                       {activeWarnings.map((w, i) => (
@@ -748,7 +835,7 @@ export default function RecordsPage() {
                 {/* Reports list */}
                 <div>
                   <p className="text-xs font-mono uppercase tracking-widest text-on-surface-variant/60 mb-3">
-                    Analysen ({aiReports.length})
+                    {locale === "en" ? `Analyses (${aiReports.length})` : `Analysen (${aiReports.length})`}
                   </p>
                   <div className="flex flex-col gap-2">
                     {aiReports.map((r) => <ReportCard key={r.id} report={r} />)}

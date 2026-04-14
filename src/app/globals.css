@@ -231,13 +231,25 @@ body {
 }
 
 /* Hide scrollbar utility */
-.hide-scrollbar {
+.hide-scrollbar,
+.no-scrollbar {
   -ms-overflow-style: none;
   scrollbar-width: none;
 }
 
-.hide-scrollbar::-webkit-scrollbar {
+.hide-scrollbar::-webkit-scrollbar,
+.no-scrollbar::-webkit-scrollbar {
   display: none;
+}
+
+/* Skeleton pulse — lighter than Tailwind default for dark theme */
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.4; }
+}
+
+.animate-pulse {
+  animation: skeleton-pulse 1.8s ease-in-out infinite;
 }
 
 /* Intensity badge - sharp corners, error container */

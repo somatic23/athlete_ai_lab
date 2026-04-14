@@ -4,6 +4,8 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils/cn";
 import { useWorkoutStore } from "@/stores/workout-store";
+import { useToast } from "@/stores/toast-store";
+import { SkeletonListItem } from "@/components/ui/skeleton";
 
 type PlanDay = {
   id: string; title: string; focus: string | null;
@@ -259,6 +261,7 @@ function SessionCard({
 export default function WorkoutHistoryPage() {
   const router = useRouter();
   const { activeWorkout, startWorkout } = useWorkoutStore();
+  const toast = useToast();
 
   const [sessions, setSessions] = useState<Session[]>([]);
   const [plans, setPlans] = useState<Plan[]>([]);
@@ -337,7 +340,9 @@ export default function WorkoutHistoryPage() {
       {/* Sessions list */}
       <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3">
         {loading ? (
-          <p className="text-sm text-on-surface-variant/50 text-center py-10">Laden…</p>
+          <div className="flex flex-col gap-3">
+            {Array.from({ length: 4 }).map((_, i) => <SkeletonListItem key={i} />)}
+          </div>
         ) : sessions.length === 0 ? (
           <div className="flex flex-col items-center justify-center gap-3 py-16 text-center">
             <p className="text-on-surface-variant/50 text-sm">Noch keine Trainingseinheiten.</p>
@@ -357,6 +362,7 @@ export default function WorkoutHistoryPage() {
               onDelete={async () => {
                 await fetch(`/api/workout/${s.id}`, { method: "DELETE" });
                 setSessions((prev) => prev.filter((x) => x.id !== s.id));
+                toast.success("Training gelöscht");
               }}
             />
           ))

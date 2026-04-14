@@ -18,6 +18,15 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "Athlete AI Lab",
   description: "Your AI-powered Strength Coach",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "AthleteAI",
+  },
+  other: {
+    "mobile-web-app-capable": "yes",
+  },
 };
 
 export default function RootLayout({
@@ -30,6 +39,12 @@ export default function RootLayout({
       lang="de"
       className={`${spaceGrotesk.variable} ${inter.variable} h-full antialiased dark`}
     >
+      <head>
+        <meta name="theme-color" content="#cafd00" />
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+        <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+        <link rel="icon" type="image/svg+xml" href="/icons/icon.svg" />
+      </head>
       <body className="min-h-full flex flex-col bg-surface text-on-surface font-body">
         <Providers>{children}</Providers>
       </body>

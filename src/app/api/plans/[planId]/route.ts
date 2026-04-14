@@ -21,6 +21,7 @@ const contentUpdateSchema = z.object({
       repsMin: z.number().int().min(1).max(999),
       repsMax: z.number().int().min(1).max(999).optional(),
       restSeconds: z.number().int().min(0).max(3600).optional(),
+      suggestedWeightKg: z.number().min(0).max(999).optional(),
       notes: z.string().max(500).optional(),
     })),
   })),
@@ -127,6 +128,7 @@ export async function PATCH(req: Request, { params }: Params) {
           repsMin: ex.repsMin,
           repsMax: ex.repsMax ?? null,
           restSeconds: ex.restSeconds ?? null,
+          suggestedWeightKg: ex.suggestedWeightKg ?? null,
           notes: ex.notes ?? null,
           createdAt: now,
         });

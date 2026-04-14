@@ -6,6 +6,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { calculateAge } from "@/lib/utils/age";
 import { useLocaleStore, type AppLocale } from "@/stores/locale-store";
+import { useToast } from "@/stores/toast-store";
+import {
+  EQUIPMENT_CATEGORIES,
+  EQUIPMENT_CATEGORY_LABELS,
+  type EquipmentCategory,
+} from "@/lib/equipment-categories";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -29,6 +35,7 @@ type EquipmentItem = {
   id: string;
   name: string;
   description: string | null;
+  category: EquipmentCategory | null;
 };
 
 // ── Constants ──────────────────────────────────────────────────────────
@@ -96,6 +103,7 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true);
 
   const { locale: storeLocale, setLocale: setStoreLocale } = useLocaleStore();
+  const toast = useToast();
 
   // Language section state
   const [selectedLocale, setSelectedLocale] = useState<AppLocale>("de");
@@ -131,6 +139,8 @@ export default function SettingsPage() {
   const [equipmentSaving, setEquipmentSaving] = useState(false);
   const [equipmentError, setEquipmentError] = useState<string | null>(null);
   const [equipmentSuccess, setEquipmentSuccess] = useState(false);
+  const [eqSearch, setEqSearch] = useState("");
+  const [eqCategoryFilter, setEqCategoryFilter] = useState<EquipmentCategory | null>(null);
 
   const [pw, setPw] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
   const [pwSaving, setPwSaving] = useState(false);
@@ -197,6 +207,7 @@ export default function SettingsPage() {
     } else {
       setAccountDirty(false);
       setAccountSuccess(true);
+      toast.success("Konto gespeichert");
       setProfile((p) => p ? { ...p, ...account } : p);
     }
     setAccountSaving(false);
@@ -252,6 +263,7 @@ export default function SettingsPage() {
     } else {
       setBodyDirty(false);
       setBodySuccess(true);
+      toast.success("Profil gespeichert");
       setProfile((p) => p ? { ...p, ...payload, birthDate: payload.birthDate } : p);
     }
     setBodySaving(false);
@@ -289,6 +301,7 @@ export default function SettingsPage() {
     } else {
       setEquipmentDirty(false);
       setEquipmentSuccess(true);
+      toast.success("Equipment gespeichert");
       setProfile((p) => p ? { ...p, equipmentIds: selectedEquipment } : p);
     }
     setEquipmentSaving(false);
@@ -324,7 +337,8 @@ export default function SettingsPage() {
     } else {
       setLocaleDirty(false);
       setLocaleSuccess(true);
-      setStoreLocale(selectedLocale); // update UI immediately
+      setStoreLocale(selectedLocale);
+      toast.success(selectedLocale === "en" ? "Language saved" : "Sprache gespeichert");
       setProfile((p) => p ? { ...p, preferredLocale: selectedLocale } : p);
     }
     setLocaleSaving(false);
@@ -370,7 +384,7 @@ export default function SettingsPage() {
 
   return (
     <div className="h-full overflow-y-auto">
-      <div className="max-w-2xl mx-auto px-6 py-8 flex flex-col gap-10">
+      <div className="max-w-3xl mx-auto px-6 py-8 flex flex-col gap-10">
 
         <div>
           <h1 className="font-headline text-2xl font-bold text-on-surface">Einstellungen</h1>
@@ -643,47 +657,158 @@ export default function SettingsPage() {
 
         {/* ── Equipment ── */}
         <section>
-          <SectionTitle>Verfuegbares Equipment</SectionTitle>
-          <div className="rounded-xl bg-surface-container p-5">
+          <SectionTitle>Verfügbares Equipment</SectionTitle>
+          <div className="rounded-xl bg-surface-container overflow-hidden">
             {catalog.length === 0 ? (
-              <p className="text-sm text-on-surface-variant">Kein Equipment im Katalog vorhanden.</p>
-            ) : (
-              <>
-                <p className="text-xs text-on-surface-variant mb-4">
-                  {selectedEquipment.length} von {catalog.length} ausgewaehlt
-                </p>
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
-                  {catalog.map((item) => {
-                    const selected = selectedEquipment.includes(item.id);
-                    return (
+              <p className="p-5 text-sm text-on-surface-variant">Kein Equipment im Katalog vorhanden.</p>
+            ) : (() => {
+              // Derived filtered list
+              const searchLow = eqSearch.toLowerCase();
+              const filtered = catalog.filter((item) => {
+                const matchesSearch = !searchLow || item.name.toLowerCase().includes(searchLow);
+                const matchesCategory = !eqCategoryFilter || item.category === eqCategoryFilter;
+                return matchesSearch && matchesCategory;
+              });
+
+              // Categories present in catalog (for chips)
+              const presentCategories = EQUIPMENT_CATEGORIES.filter((cat) =>
+                catalog.some((item) => item.category === cat)
+              );
+
+              // Group by category (only when no search active)
+              const showGrouped = !searchLow && !eqCategoryFilter;
+              const groups: { catKey: EquipmentCategory | null; label: string; items: typeof catalog }[] = [];
+              if (showGrouped) {
+                for (const cat of EQUIPMENT_CATEGORIES) {
+                  const items = catalog.filter((i) => i.category === cat);
+                  if (items.length) groups.push({
+                    catKey: cat,
+                    label: storeLocale === "en"
+                      ? EQUIPMENT_CATEGORY_LABELS[cat].en
+                      : EQUIPMENT_CATEGORY_LABELS[cat].de,
+                    items,
+                  });
+                }
+                const uncategorized = catalog.filter((i) => !i.category);
+                if (uncategorized.length) groups.push({ catKey: null, label: "Sonstiges", items: uncategorized });
+              }
+
+              return (
+                <>
+                  {/* Search + count row */}
+                  <div className="flex items-center gap-3 px-4 pt-4 pb-3">
+                    <div className="relative flex-1">
+                      <span className="absolute left-3 top-1/2 -translate-y-1/2 text-on-surface-variant/40 text-xs pointer-events-none">
+                        ⌕
+                      </span>
+                      <input
+                        type="search"
+                        placeholder="Suchen…"
+                        value={eqSearch}
+                        onChange={(e) => setEqSearch(e.target.value)}
+                        className="w-full rounded-lg bg-surface-container-high pl-7 pr-3 py-1.5 text-sm text-on-surface placeholder:text-on-surface-variant/40 outline-none focus:ring-1 focus:ring-primary/40 transition-all"
+                      />
+                    </div>
+                    <span className="shrink-0 text-xs font-mono text-on-surface-variant/50">
+                      {selectedEquipment.length}/{catalog.length}
+                    </span>
+                  </div>
+
+                  {/* Category filter chips */}
+                  {presentCategories.length > 1 && (
+                    <div className="flex gap-1.5 px-4 pb-3 overflow-x-auto no-scrollbar">
                       <button
-                        key={item.id}
-                        type="button"
-                        onClick={() => toggleEquipment(item.id)}
+                        onClick={() => setEqCategoryFilter(null)}
                         className={cn(
-                          "rounded-md px-3 py-2.5 text-left text-sm transition-all",
-                          selected
-                            ? "bg-primary-container text-on-primary"
-                            : "bg-surface-container-high text-on-surface hover:bg-surface-container-highest"
+                          "shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium transition-all",
+                          !eqCategoryFilter
+                            ? "bg-primary text-on-primary"
+                            : "bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest"
                         )}
                       >
-                        <span className="flex items-center gap-2">
-                          <span className={cn(
-                            "flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border text-xs font-bold transition-colors",
-                            selected
-                              ? "border-on-primary bg-transparent text-on-primary"
-                              : "border-outline-variant text-transparent"
-                          )}>
-                            ✓
-                          </span>
-                          {item.name}
-                        </span>
+                        Alle
                       </button>
-                    );
-                  })}
-                </div>
-              </>
-            )}
+                      {presentCategories.map((cat) => (
+                        <button
+                          key={cat}
+                          onClick={() => setEqCategoryFilter(eqCategoryFilter === cat ? null : cat)}
+                          className={cn(
+                            "shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium transition-all",
+                            eqCategoryFilter === cat
+                              ? "bg-primary text-on-primary"
+                              : "bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest"
+                          )}
+                        >
+                          {storeLocale === "en"
+                            ? EQUIPMENT_CATEGORY_LABELS[cat].en
+                            : EQUIPMENT_CATEGORY_LABELS[cat].de}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Items */}
+                  <div className="px-4 pb-4 max-h-72 overflow-y-auto no-scrollbar">
+                    {filtered.length === 0 ? (
+                      <p className="text-xs text-on-surface-variant/50 py-4 text-center">Keine Treffer</p>
+                    ) : showGrouped ? (
+                      <div className="flex flex-col gap-4">
+                        {groups.map(({ catKey, label, items }) => (
+                          <div key={catKey ?? "__none"}>
+                            <p className="text-[10px] font-mono uppercase tracking-widest text-on-surface-variant/40 mb-1.5">
+                              {label}
+                            </p>
+                            <div className="flex flex-wrap gap-1.5">
+                              {items.map((item) => {
+                                const selected = selectedEquipment.includes(item.id);
+                                return (
+                                  <button
+                                    key={item.id}
+                                    type="button"
+                                    onClick={() => toggleEquipment(item.id)}
+                                    className={cn(
+                                      "rounded-full px-2.5 py-1 text-xs font-medium transition-all",
+                                      selected
+                                        ? "bg-primary text-on-primary"
+                                        : "bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest"
+                                    )}
+                                  >
+                                    {selected && <span className="mr-1 text-[10px]">✓</span>}
+                                    {item.name}
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap gap-1.5 pt-1">
+                        {filtered.map((item) => {
+                          const selected = selectedEquipment.includes(item.id);
+                          return (
+                            <button
+                              key={item.id}
+                              type="button"
+                              onClick={() => toggleEquipment(item.id)}
+                              className={cn(
+                                "rounded-full px-2.5 py-1 text-xs font-medium transition-all",
+                                selected
+                                  ? "bg-primary text-on-primary"
+                                  : "bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest"
+                              )}
+                            >
+                              {selected && <span className="mr-1 text-[10px]">✓</span>}
+                              {item.name}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                </>
+              );
+            })()}
           </div>
           <SaveBar
             dirty={equipmentDirty}

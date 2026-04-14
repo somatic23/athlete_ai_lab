@@ -6,18 +6,19 @@ import Link from "next/link";
 import { signOut } from "next-auth/react";
 import { cn } from "@/lib/utils/cn";
 import { useLocaleStore } from "@/stores/locale-store";
+import { ErrorBoundary } from "@/components/ui/error-boundary";
 
 const NAV_ITEMS = [
-  { href: "/coach",           label: "AI Coach",        icon: "◈" },
-  { href: "/plans",           label: "Trainingsplaene", icon: "▦" },
-  { href: "/calendar",        label: "Kalender",         icon: "▣" },
-  { href: "/workout/history", label: "Historie",         icon: "◫" },
-  { href: "/records",         label: "Bestleistungen",   icon: "◆" },
+  { href: "/coach",           label: "AI Coach",      labelEn: "AI Coach",    icon: "◈" },
+  { href: "/plans",           label: "Pläne",         labelEn: "Plans",       icon: "▦" },
+  { href: "/calendar",        label: "Kalender",      labelEn: "Calendar",    icon: "▣" },
+  { href: "/workout/history", label: "Training",      labelEn: "Workout",     icon: "◫" },
+  { href: "/records",         label: "Bestleistungen",labelEn: "Records",     icon: "◆" },
 ];
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
-  const setLocale = useLocaleStore((s) => s.setLocale);
+  const { locale, setLocale } = useLocaleStore();
 
   // Sync locale from user profile once on mount
   useEffect(() => {
@@ -29,10 +30,10 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="flex h-screen overflow-hidden bg-surface">
-      {/* Sidebar */}
-      <aside className="hidden w-60 shrink-0 flex-col bg-surface-container-low lg:flex">
+      {/* ── Desktop Sidebar ───────────────────────────────────── */}
+      <aside className="hidden w-56 shrink-0 flex-col bg-surface-container-low lg:flex">
         <div className="px-5 py-6">
-          <span className="font-headline text-base font-bold tracking-tight text-primary">
+          <span className="font-headline text-sm font-bold tracking-tight text-primary">
             ATHLETE AI LAB
           </span>
         </div>
@@ -41,6 +42,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           <ul className="flex flex-col gap-0.5">
             {NAV_ITEMS.map((item) => {
               const active = pathname === item.href || pathname.startsWith(item.href + "/");
+              const label = locale === "en" ? item.labelEn : item.label;
               return (
                 <li key={item.href}>
                   <Link
@@ -52,8 +54,8 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
                         : "text-on-surface-variant hover:bg-surface-container hover:text-on-surface"
                     )}
                   >
-                    <span className="text-base">{item.icon}</span>
-                    {item.label}
+                    <span className="text-base leading-none">{item.icon}</span>
+                    {label}
                   </Link>
                 </li>
               );
@@ -61,35 +63,85 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </ul>
         </nav>
 
-        <div className="flex flex-col gap-1 px-5 py-5">
+        <div className="flex flex-col gap-1 px-5 py-5 border-t border-outline-variant/10">
           <Link
             href="/settings"
-            className="text-xs text-on-surface-variant hover:text-on-surface transition-colors"
+            className={cn(
+              "text-xs transition-colors py-1",
+              pathname === "/settings" ? "text-primary" : "text-on-surface-variant hover:text-on-surface"
+            )}
           >
-            Einstellungen
+            {locale === "en" ? "Settings" : "Einstellungen"}
           </Link>
           <button
             onClick={() => signOut({ redirectTo: "/login" })}
-            className="text-left text-xs text-on-surface-variant/60 hover:text-error transition-colors"
+            className="text-left text-xs text-on-surface-variant/60 hover:text-error transition-colors py-1"
           >
-            Abmelden
+            {locale === "en" ? "Sign out" : "Abmelden"}
           </button>
         </div>
       </aside>
 
-      {/* Mobile top bar */}
-      <div className="fixed inset-x-0 top-0 z-10 flex items-center justify-between bg-surface/80 px-4 py-3 backdrop-blur-sm lg:hidden">
-        <span className="font-headline text-sm font-bold text-primary">ATHLETE AI LAB</span>
+      {/* ── Mobile top bar ────────────────────────────────────── */}
+      <div className="fixed inset-x-0 top-0 z-10 flex items-center justify-between glass px-4 py-3 lg:hidden">
+        <span className="font-headline text-sm font-bold text-primary tracking-tight">
+          ATHLETE AI LAB
+        </span>
+        <Link
+          href="/settings"
+          className={cn(
+            "text-xs transition-colors",
+            pathname === "/settings" ? "text-primary" : "text-on-surface-variant"
+          )}
+          aria-label="Settings"
+        >
+          ⚙
+        </Link>
       </div>
 
-      {/* Main */}
+      {/* ── Main content ─────────────────────────────────────── */}
       <main className="flex flex-1 flex-col overflow-hidden">
         {/* Mobile spacer for fixed top bar */}
-        <div className="h-12 shrink-0 lg:hidden" />
-        <div className="min-h-0 flex-1">
-          {children}
+        <div className="h-[52px] shrink-0 lg:hidden" />
+        <div className="min-h-0 flex-1 overflow-hidden">
+          <ErrorBoundary>
+            {children}
+          </ErrorBoundary>
         </div>
+        {/* Mobile spacer for bottom nav */}
+        <div className="h-16 shrink-0 lg:hidden" />
       </main>
+
+      {/* ── Mobile bottom navigation ──────────────────────────── */}
+      <nav
+        className="fixed inset-x-0 bottom-0 z-10 glass lg:hidden"
+        style={{ paddingBottom: "env(safe-area-inset-bottom, 0px)" }}
+      >
+        <ul className="flex h-16 items-center justify-around px-1">
+          {NAV_ITEMS.map((item) => {
+            const active = pathname === item.href || pathname.startsWith(item.href + "/");
+            const label = locale === "en" ? item.labelEn : item.label;
+            return (
+              <li key={item.href} className="flex-1">
+                <Link
+                  href={item.href}
+                  className={cn(
+                    "flex flex-col items-center gap-0.5 py-2 px-1 rounded-lg transition-all",
+                    active ? "text-primary" : "text-on-surface-variant/60"
+                  )}
+                >
+                  <span className={cn("text-lg leading-none transition-transform", active && "scale-110")}>
+                    {item.icon}
+                  </span>
+                  <span className="text-[10px] font-medium truncate max-w-[52px] text-center leading-none">
+                    {label}
+                  </span>
+                </Link>
+              </li>
+            );
+          })}
+        </ul>
+      </nav>
     </div>
   );
 }

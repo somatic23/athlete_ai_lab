@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import type { CoachingSuggestion } from "@/lib/ai/coaching-suggestion-schema";
 import { useParams, useRouter } from "next/navigation";
 import {
   DndContext,
@@ -30,6 +31,7 @@ type PlanExercise = {
   repsMin: number;
   repsMax: number | null;
   restSeconds: number | null;
+  suggestedWeightKg: number | null;
   notes: string | null;
   exercise: { id: string; nameI18n: string; primaryMuscleGroup: string };
 };
@@ -41,6 +43,7 @@ type TrainingDay = {
   focus: string | null;
   estimatedDurationMin: number | null;
   sortOrder: number;
+  pendingAiSuggestion: string | null;
   exercises: PlanExercise[];
 };
 
@@ -66,6 +69,7 @@ type EditExercise = {
   repsMin: number | "";
   repsMax: number | "";
   restSeconds: number | "";
+  suggestedWeightKg: number | "";
   notes: string;
 };
 
@@ -123,6 +127,7 @@ function toEditDays(days: TrainingDay[]): EditDay[] {
       repsMin: ex.repsMin,
       repsMax: ex.repsMax ?? "",
       restSeconds: ex.restSeconds ?? "",
+      suggestedWeightKg: ex.suggestedWeightKg ?? "",
       notes: ex.notes ?? "",
     })),
   }));
@@ -142,6 +147,7 @@ function toApiPayload(title: string, description: string, days: EditDay[]) {
         repsMin: typeof e.repsMin === "number" ? e.repsMin : 8,
         repsMax: typeof e.repsMax === "number" ? e.repsMax : undefined,
         restSeconds: typeof e.restSeconds === "number" ? e.restSeconds : undefined,
+        suggestedWeightKg: typeof e.suggestedWeightKg === "number" ? e.suggestedWeightKg : undefined,
         notes: e.notes || undefined,
       })),
     })),
@@ -214,12 +220,13 @@ function SortableExRow({ ex, onChange, onRemove }: {
   const numInput = (
     value: number | "",
     key: keyof EditExercise,
-    props?: React.InputHTMLAttributes<HTMLInputElement>
+    props?: React.InputHTMLAttributes<HTMLInputElement>,
+    float?: boolean
   ) => (
     <input
       type="number"
       value={value}
-      onChange={(e) => onChange({ [key]: e.target.value === "" ? "" : parseInt(e.target.value) } as Partial<EditExercise>)}
+      onChange={(e) => onChange({ [key]: e.target.value === "" ? "" : (float ? parseFloat(e.target.value) : parseInt(e.target.value)) } as Partial<EditExercise>)}
       className="w-full rounded-md bg-surface-container-highest px-2 py-1.5 text-center text-sm text-on-surface outline-none focus:bg-surface-bright transition-colors"
       {...props}
     />
@@ -243,7 +250,7 @@ function SortableExRow({ ex, onChange, onRemove }: {
         </span>
         <button onClick={onRemove} className="text-xs text-on-surface-variant/40 hover:text-error transition-colors px-1">✕</button>
       </div>
-      <div className="grid grid-cols-4 gap-2">
+      <div className="grid grid-cols-5 gap-2">
         <div className="flex flex-col gap-1">
           <label className="text-center text-xs text-on-surface-variant/60">Sets</label>
           {numInput(ex.sets, "sets", { min: 1 })}
@@ -255,6 +262,10 @@ function SortableExRow({ ex, onChange, onRemove }: {
         <div className="flex flex-col gap-1">
           <label className="text-center text-xs text-on-surface-variant/60">Wdh. max</label>
           {numInput(ex.repsMax, "repsMax", { min: 1, placeholder: "—" })}
+        </div>
+        <div className="flex flex-col gap-1">
+          <label className="text-center text-xs text-on-surface-variant/60">Gewicht (kg)</label>
+          {numInput(ex.suggestedWeightKg, "suggestedWeightKg", { min: 0, step: 0.5, placeholder: "—" }, true)}
         </div>
         <div className="flex flex-col gap-1">
           <label className="text-center text-xs text-on-surface-variant/60">Pause (s)</label>
@@ -359,17 +370,161 @@ function EditDaySection({
   );
 }
 
+// ── SuggestionCard ─────────────────────────────────────────────────────
+
+const CHANGE_TYPE_LABEL: Record<string, string> = {
+  progression: "↑ Progression",
+  deload: "↓ Deload",
+  maintenance: "= Unverändert",
+  recovery: "♻ Recovery",
+};
+const CHANGE_TYPE_COLOR: Record<string, string> = {
+  progression: "text-secondary",
+  deload: "text-error",
+  maintenance: "text-on-surface-variant/50",
+  recovery: "text-tertiary",
+};
+
+function SuggestionCard({ dayId, planId, currentExercises, suggestion, onAccepted, onRejected }: {
+  dayId: string;
+  planId: string;
+  currentExercises: PlanExercise[];
+  suggestion: CoachingSuggestion;
+  onAccepted: () => void;
+  onRejected: () => void;
+}) {
+  const [accepting, setAccepting] = useState(false);
+  const [rejecting, setRejecting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleAccept() {
+    setAccepting(true); setError(null);
+    const res = await fetch(`/api/plans/${planId}/days/${dayId}/suggest`, { method: "PATCH" });
+    if (res.ok) { onAccepted(); }
+    else {
+      const text = await res.text();
+      let msg = "Fehler";
+      try { msg = (JSON.parse(text) as { error?: string }).error ?? msg; } catch { /* ignore */ }
+      setError(msg);
+      setAccepting(false);
+    }
+  }
+
+  async function handleReject() {
+    setRejecting(true);
+    await fetch(`/api/plans/${planId}/days/${dayId}/suggest`, { method: "DELETE" });
+    onRejected();
+  }
+
+  return (
+    <div className="mt-3 rounded-xl border border-secondary/20 bg-secondary/5 overflow-hidden">
+      <div className="px-4 py-3 border-b border-secondary/10">
+        <div className="flex items-center justify-between gap-2">
+          <span className="text-xs font-mono font-bold text-secondary">✦ KI-Coaching-Vorschlag</span>
+          <span className="text-xs font-mono text-on-surface-variant/50">
+            {new Date(suggestion.generatedAt).toLocaleString("de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+          </span>
+        </div>
+        {suggestion.rationale && (
+          <p className="mt-1.5 text-xs text-on-surface-variant leading-relaxed">{suggestion.rationale}</p>
+        )}
+      </div>
+
+      <div className="px-4 py-2">
+        {/* Table header */}
+        <div className="flex items-center gap-2 pb-1.5 text-xs font-mono text-on-surface-variant/40">
+          <span className="flex-1">Übung</span>
+          <span className="w-28 text-right">Aktuell</span>
+          <span className="w-28 text-right">Vorschlag</span>
+          <span className="w-20 text-right">Änderung</span>
+        </div>
+
+        {suggestion.exercises.map((sEx) => {
+          const current = currentExercises.find((c) => c.exercise.id === sEx.exerciseId);
+          const curStr = current
+            ? `${current.sets}×${repsLabel(current.repsMin, current.repsMax)}${current.suggestedWeightKg ? ` · ${current.suggestedWeightKg}kg` : ""}`
+            : "—";
+          const sugStr = `${sEx.sets}×${repsLabel(sEx.repsMin, sEx.repsMax ?? null)}${sEx.suggestedWeightKg != null ? ` · ${sEx.suggestedWeightKg}kg` : ""}`;
+          const changed = curStr !== sugStr;
+
+          return (
+            <div
+              key={sEx.exerciseId}
+              className={cn(
+                "py-2 border-b border-outline-variant/5 last:border-0",
+                sEx.changeType === "progression" && changed && "bg-secondary/5 -mx-4 px-4",
+                sEx.changeType === "deload" && "bg-error/5 -mx-4 px-4",
+              )}
+            >
+              <div className="flex items-start gap-2">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-on-surface truncate">{sEx.exerciseName}</p>
+                  {sEx.changeReason && <p className="text-xs font-mono text-on-surface-variant/50 mt-0.5 leading-tight">{sEx.changeReason}</p>}
+                </div>
+                <span className="w-28 text-right text-xs font-mono text-on-surface-variant/60 shrink-0">{curStr}</span>
+                <span className="w-28 text-right text-xs font-mono text-on-surface shrink-0">{sugStr}</span>
+                <span className={cn("w-20 text-right text-xs font-mono shrink-0", CHANGE_TYPE_COLOR[sEx.changeType] ?? "text-on-surface-variant")}>
+                  {CHANGE_TYPE_LABEL[sEx.changeType] ?? sEx.changeType}
+                </span>
+              </div>
+              {sEx.notes && <p className="mt-0.5 text-xs text-on-surface-variant/60 italic">{sEx.notes}</p>}
+            </div>
+          );
+        })}
+      </div>
+
+      {error && <div className="mx-4 mb-2 rounded-lg bg-error-container/20 px-3 py-2 text-xs text-error">{error}</div>}
+
+      <div className="flex items-center justify-between gap-3 px-4 py-3 border-t border-secondary/10">
+        <button
+          onClick={handleReject}
+          disabled={rejecting || accepting}
+          className="text-xs font-mono text-on-surface-variant hover:text-error disabled:opacity-40 transition-colors"
+        >
+          {rejecting ? "…" : "Verwerfen"}
+        </button>
+        <button
+          onClick={handleAccept}
+          disabled={accepting || rejecting}
+          className="text-xs font-mono font-bold text-secondary hover:opacity-80 disabled:opacity-40 transition-all"
+        >
+          {accepting ? "…" : "Übernehmen →"}
+        </button>
+      </div>
+    </div>
+  );
+}
+
 // ── Read-only day section ──────────────────────────────────────────────
 
-function DaySection({ day }: { day: TrainingDay }) {
+function DaySection({ day, planId, onPlanRefresh }: {
+  day: TrainingDay;
+  planId: string;
+  onPlanRefresh: () => void;
+}) {
   const [open, setOpen] = useState(true);
+  const [suggesting, setSuggesting] = useState(false);
+  const [suggestionError, setSuggestionError] = useState<string | null>(null);
+  const [localSuggestion, setLocalSuggestion] = useState<CoachingSuggestion | null>(() => {
+    try { return day.pendingAiSuggestion ? (JSON.parse(day.pendingAiSuggestion) as CoachingSuggestion) : null; }
+    catch { return null; }
+  });
+
+  async function handleRequestSuggestion() {
+    setSuggesting(true); setSuggestionError(null);
+    const res = await fetch(`/api/plans/${planId}/days/${day.id}/suggest`, { method: "POST" });
+    const text = await res.text();
+    let data: Record<string, unknown> = {};
+    try { data = JSON.parse(text) as Record<string, unknown>; } catch { setSuggestionError("Server-Fehler"); setSuggesting(false); return; }
+    if (!res.ok) setSuggestionError((data.error as string) ?? "Fehler");
+    else setLocalSuggestion(data.suggestion as CoachingSuggestion);
+    setSuggesting(false);
+  }
+
   return (
     <div className="rounded-xl bg-surface-container overflow-hidden">
-      <button
-        onClick={() => setOpen(!open)}
-        className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-surface-container-high transition-colors"
-      >
-        <div>
+      <div className="w-full flex items-center justify-between px-5 py-4 hover:bg-surface-container-high transition-colors">
+        <div className="flex-1 cursor-pointer" onClick={() => setOpen(!open)}>
           <div className="flex items-center gap-2">
             <span className="text-xs font-mono text-on-surface-variant/50">Tag {day.dayNumber}</span>
             {day.focus && <span className="text-xs font-mono text-secondary">{day.focus}</span>}
@@ -377,12 +532,21 @@ function DaySection({ day }: { day: TrainingDay }) {
           <h4 className="font-headline font-bold text-on-surface mt-0.5">{day.title}</h4>
         </div>
         <div className="flex items-center gap-3 shrink-0">
-          <span className="text-xs font-mono text-on-surface-variant">
-            {day.exercises.length} Übungen{day.estimatedDurationMin && ` · ${day.estimatedDurationMin} Min`}
+          {!localSuggestion && (
+            <button
+              onClick={handleRequestSuggestion}
+              disabled={suggesting}
+              className="text-xs font-mono text-secondary hover:opacity-80 disabled:opacity-40 transition-all"
+            >
+              {suggesting ? "…" : "✦ KI-Vorschlag"}
+            </button>
+          )}
+          <span className="text-xs font-mono text-on-surface-variant cursor-pointer" onClick={() => setOpen(!open)}>
+            {day.exercises.length} Übungen{day.estimatedDurationMin ? ` · ${day.estimatedDurationMin} Min` : ""}
           </span>
-          <span className={cn("text-on-surface-variant transition-transform", open && "rotate-180")}>▾</span>
+          <span className={cn("text-on-surface-variant transition-transform cursor-pointer", open && "rotate-180")} onClick={() => setOpen(!open)}>▾</span>
         </div>
-      </button>
+      </div>
       {open && (
         <div className="px-5 pb-4">
           {day.exercises.length === 0 ? (
@@ -392,6 +556,7 @@ function DaySection({ day }: { day: TrainingDay }) {
               <div className="flex items-center gap-3 pb-2 text-xs font-mono text-on-surface-variant/50">
                 <span className="flex-1">Übung</span>
                 <span className="w-16 text-right">Sets×Wdh</span>
+                <span className="w-16 text-right">Gewicht</span>
                 <span className="w-12 text-right">Pause</span>
                 <span className="w-24 text-right">Muskelgruppe</span>
               </div>
@@ -402,11 +567,25 @@ function DaySection({ day }: { day: TrainingDay }) {
                     {ex.notes && <p className="text-xs text-on-surface-variant mt-0.5 truncate">{ex.notes}</p>}
                   </div>
                   <span className="w-16 text-right text-xs font-mono text-on-surface-variant">{ex.sets}×{repsLabel(ex.repsMin, ex.repsMax)}</span>
+                  <span className="w-16 text-right text-xs font-mono text-on-surface-variant">{ex.suggestedWeightKg ? `${ex.suggestedWeightKg} kg` : "—"}</span>
                   <span className="w-12 text-right text-xs font-mono text-on-surface-variant">{ex.restSeconds ? `${ex.restSeconds}s` : "—"}</span>
                   <span className="w-24 text-right text-xs font-mono text-secondary">{MUSCLE_LABELS[ex.exercise.primaryMuscleGroup] ?? ex.exercise.primaryMuscleGroup}</span>
                 </div>
               ))}
             </>
+          )}
+          {suggestionError && (
+            <div className="mt-2 rounded-lg bg-error-container/20 px-3 py-2 text-xs text-error">{suggestionError}</div>
+          )}
+          {localSuggestion && (
+            <SuggestionCard
+              dayId={day.id}
+              planId={planId}
+              currentExercises={day.exercises}
+              suggestion={localSuggestion}
+              onAccepted={() => { setLocalSuggestion(null); onPlanRefresh(); }}
+              onRejected={() => setLocalSuggestion(null)}
+            />
           )}
         </div>
       )}
@@ -435,13 +614,15 @@ export default function PlanDetailPage() {
   // Status updating
   const [statusUpdating, setStatusUpdating] = useState(false);
 
-  useEffect(() => {
+  const refreshPlan = useCallback(() => {
     fetch(`/api/plans/${planId}`)
       .then(async (r) => { if (!r.ok) throw new Error("Plan nicht gefunden"); return r.json(); })
       .then(setPlan)
-      .catch((e) => setFetchError(e.message))
+      .catch((e) => setFetchError(e instanceof Error ? e.message : String(e)))
       .finally(() => setLoading(false));
   }, [planId]);
+
+  useEffect(() => { refreshPlan(); }, [refreshPlan]);
 
   function enterEditMode() {
     if (!plan) return;
@@ -476,8 +657,7 @@ export default function PlanDetailPage() {
         throw new Error(data.error ?? "Fehler beim Speichern");
       }
       // Reload plan from server
-      const refreshed = await fetch(`/api/plans/${planId}`).then((r) => r.json());
-      setPlan(refreshed);
+      refreshPlan();
       setEditMode(false);
     } catch (err) {
       setSaveError(err instanceof Error ? err.message : String(err));
@@ -524,7 +704,7 @@ export default function PlanDetailPage() {
 
   const addExercise = useCallback((dayUid: string, ex: CatalogExercise) => {
     setEditDays((prev) => prev.map((d) =>
-      d.uid === dayUid ? { ...d, exercises: [...d.exercises, { uid: mkId(), exerciseId: ex.id, exerciseName: parseName(ex.nameI18n), primaryMuscleGroup: ex.primaryMuscleGroup, sets: 3, repsMin: 8, repsMax: 12, restSeconds: 90, notes: "" }] } : d
+      d.uid === dayUid ? { ...d, exercises: [...d.exercises, { uid: mkId(), exerciseId: ex.id, exerciseName: parseName(ex.nameI18n), primaryMuscleGroup: ex.primaryMuscleGroup, sets: 3, repsMin: 8, repsMax: 12, restSeconds: 90, suggestedWeightKg: "", notes: "" }] } : d
     ));
   }, []);
 
@@ -663,7 +843,7 @@ export default function PlanDetailPage() {
               )}
             </>
           ) : (
-            plan.days.map((day) => <DaySection key={day.id} day={day} />)
+            plan.days.map((day) => <DaySection key={day.id} day={day} planId={planId} onPlanRefresh={refreshPlan} />)
           )}
         </div>
 
