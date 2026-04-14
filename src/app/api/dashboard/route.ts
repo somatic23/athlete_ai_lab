@@ -28,8 +28,8 @@ export async function GET() {
 
   const now = new Date();
   const today = now.toISOString().slice(0, 10);
-  const cutoff14 = new Date(Date.now() - 14 * 86_400_000).toISOString().slice(0, 10);
   const cutoff30 = new Date(Date.now() - 30 * 86_400_000).toISOString();
+  const cutoff30Date = cutoff30.slice(0, 10);
 
   const [userRow, activePlanRow, nextEventRow, loadRows, lastReportRow, recentSessionRows] =
     await Promise.all([
@@ -71,9 +71,9 @@ export async function GET() {
         },
       }),
 
-      // 4. Muscle group load log (last 14 days)
+      // 4. Muscle group load log (last 30 days — used for both recovery card and chart)
       db.select().from(muscleGroupLoadLog)
-        .where(and(eq(muscleGroupLoadLog.userId, userId), gte(muscleGroupLoadLog.date, cutoff14)))
+        .where(and(eq(muscleGroupLoadLog.userId, userId), gte(muscleGroupLoadLog.date, cutoff30Date)))
         .orderBy(desc(muscleGroupLoadLog.date)),
 
       // 5. Last AI report
@@ -85,6 +85,8 @@ export async function GET() {
       // 6. Recent completed sessions (last 30 days)
       db.select({
         totalVolumeKg: workoutSessions.totalVolumeKg,
+        totalSets: workoutSessions.totalSets,
+        durationSeconds: workoutSessions.durationSeconds,
         sessionRpeAvg: workoutSessions.sessionRpeAvg,
         completedAt: workoutSessions.completedAt,
       })
@@ -214,12 +216,60 @@ export async function GET() {
     ? rpeValues.reduce((a, b) => a + b, 0) / rpeValues.length
     : null;
 
+  // Build 30-day training load series (volume, duration, total sets)
+  const byDay = new Map<string, { volumeKg: number; sets: number; durationSec: number }>();
+  for (const row of completedRows) {
+    if (!row.completedAt) continue;
+    const day = row.completedAt.slice(0, 10);
+    const existing = byDay.get(day) ?? { volumeKg: 0, sets: 0, durationSec: 0 };
+    byDay.set(day, {
+      volumeKg: existing.volumeKg + (row.totalVolumeKg ?? 0),
+      sets: existing.sets + (row.totalSets ?? 0),
+      durationSec: existing.durationSec + (row.durationSeconds ?? 0),
+    });
+  }
+  const trainingLoad = Array.from({ length: 30 }, (_, i) => {
+    const d = new Date(Date.now() - (29 - i) * 86_400_000);
+    const dateStr = d.toISOString().slice(0, 10);
+    const entry = byDay.get(dateStr);
+    return {
+      date: dateStr,
+      volumeKg: entry ? Math.round(entry.volumeKg) : 0,
+      sets: entry?.sets ?? 0,
+      durationMin: entry ? Math.round(entry.durationSec / 60) : 0,
+    };
+  });
+
+  // Build 30-day sets-per-muscle-group series (for stacked chart)
+  const ALL_MUSCLES = [
+    "chest", "back", "shoulders", "biceps", "triceps", "forearms",
+    "quadriceps", "hamstrings", "glutes", "calves", "core", "full_body",
+  ] as const;
+  const muscleSetsByDay = new Map<string, Map<string, number>>();
+  for (const row of loadRows) {
+    if (!muscleSetsByDay.has(row.date)) muscleSetsByDay.set(row.date, new Map());
+    const prev = muscleSetsByDay.get(row.date)!.get(row.muscleGroup) ?? 0;
+    muscleSetsByDay.get(row.date)!.set(row.muscleGroup, prev + (row.totalSets ?? 0));
+  }
+  const muscleLoad = Array.from({ length: 30 }, (_, i) => {
+    const d = new Date(Date.now() - (29 - i) * 86_400_000);
+    const dateStr = d.toISOString().slice(0, 10);
+    const dayData = muscleSetsByDay.get(dateStr);
+    const entry: Record<string, number | string> = { date: dateStr };
+    for (const m of ALL_MUSCLES) {
+      entry[m] = dayData?.get(m) ?? 0;
+    }
+    return entry;
+  });
+
   return NextResponse.json({
     user: { displayName: userRow?.displayName ?? "" },
     activePlan,
     nextSession,
     recovery,
     lastReport,
+    trainingLoad,
+    muscleLoad,
     recentStats: {
       sessionsCount,
       totalVolumeKg: Math.round(totalVolumeKg),
