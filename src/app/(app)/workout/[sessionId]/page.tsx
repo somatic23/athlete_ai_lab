@@ -10,6 +10,7 @@ import {
   type SetOutcome,
   type WorkoutExercise,
 } from "@/stores/workout-store";
+import { ExerciseAlternativesModal, type ExerciseAlternative } from "@/components/exercise-alternatives-modal";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -373,9 +374,28 @@ function ExerciseCard({
   sessionId: string;
   onSetLogged: (exerciseIdx: number, restSeconds: number | null, set: LoggedSet) => void;
 }) {
-  const { addLoggedSet, removeLoggedSet, updateLoggedSet } = useWorkoutStore();
+  const { addLoggedSet, removeLoggedSet, updateLoggedSet, replaceExercise } = useWorkoutStore();
   const [isLogging, setIsLogging] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const [showAltModal, setShowAltModal] = useState(false);
+
+  function handleSelectAlternative(alt: ExerciseAlternative) {
+    replaceExercise(exerciseIdx, {
+      planExerciseId: null,
+      exerciseId: alt.exerciseId,
+      name: alt.exerciseName,
+      primaryMuscleGroup: alt.primaryMuscleGroup,
+      targetSets: alt.sets,
+      repsMin: alt.repsMin,
+      repsMax: alt.repsMax,
+      targetRpe: null,
+      restSeconds: exercise.restSeconds,
+      suggestedWeightKg: alt.suggestedWeightKg,
+      notes: null,
+      loggedSets: [],
+    });
+    setShowAltModal(false);
+  }
 
   const loggedSets = exercise.loggedSets ?? [];
   const nextSetNumber = loggedSets.length + 1;
@@ -421,11 +441,11 @@ function ExerciseCard({
   return (
     <div className="rounded-2xl bg-surface-container-low flex flex-col">
       {/* Card header */}
-      <button
-        onClick={() => setCollapsed((v) => !v)}
-        className="flex items-center justify-between px-5 py-4 text-left w-full"
-      >
-        <div className="flex items-center gap-3 min-w-0">
+      <div className="flex items-center justify-between px-5 py-4">
+        <div
+          className="flex items-center gap-3 min-w-0 flex-1 cursor-pointer"
+          onClick={() => setCollapsed((v) => !v)}
+        >
           <div className={cn(
             "flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-xs font-bold",
             isDone
@@ -444,15 +464,27 @@ function ExerciseCard({
           </div>
         </div>
         <div className="flex items-center gap-2 shrink-0 ml-2">
-          <span className={cn(
-            "text-xs font-mono font-bold px-2 py-0.5 rounded-full",
-            isDone ? "bg-secondary/20 text-secondary" : "bg-surface-container text-on-surface-variant/60"
-          )}>
+          <button
+            onClick={() => setShowAltModal(true)}
+            className="text-xs font-mono text-secondary/70 hover:text-secondary transition-colors px-1.5 py-0.5 rounded hover:bg-secondary/10"
+            title="KI-Alternative vorschlagen"
+          >
+            ⇄
+          </button>
+          <span
+            className={cn(
+              "text-xs font-mono font-bold px-2 py-0.5 rounded-full cursor-pointer",
+              isDone ? "bg-secondary/20 text-secondary" : "bg-surface-container text-on-surface-variant/60"
+            )}
+            onClick={() => setCollapsed((v) => !v)}
+          >
             {doneCount}/{exercise.targetSets}
           </span>
-          <span className="text-on-surface-variant/40 text-xs">{collapsed ? "▼" : "▲"}</span>
+          <span className="text-on-surface-variant/40 text-xs cursor-pointer" onClick={() => setCollapsed((v) => !v)}>
+            {collapsed ? "▼" : "▲"}
+          </span>
         </div>
-      </button>
+      </div>
 
       {!collapsed && (
         <div className="px-5 pb-5 flex flex-col">
@@ -491,6 +523,19 @@ function ExerciseCard({
             <p className="mt-1 text-xs text-on-surface-variant/50 italic">{exercise.notes}</p>
           )}
         </div>
+      )}
+      {showAltModal && (
+        <ExerciseAlternativesModal
+          exerciseId={exercise.exerciseId}
+          exerciseName={exercise.name}
+          primaryMuscleGroup={exercise.primaryMuscleGroup}
+          sets={exercise.targetSets}
+          repsMin={exercise.repsMin}
+          repsMax={exercise.repsMax}
+          suggestedWeightKg={exercise.suggestedWeightKg}
+          onSelect={handleSelectAlternative}
+          onClose={() => setShowAltModal(false)}
+        />
       )}
     </div>
   );
@@ -555,6 +600,7 @@ export default function WorkoutPage({ params }: { params: Promise<{ sessionId: s
       planExerciseId: null,
       exerciseId: ex.id,
       name: parseName(ex.nameI18n),
+      primaryMuscleGroup: ex.primaryMuscleGroup,
       targetSets: 3,
       repsMin: 8,
       repsMax: 12,

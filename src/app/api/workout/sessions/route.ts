@@ -72,6 +72,7 @@ export async function POST(req: NextRequest) {
     planExerciseId: string;
     exerciseId: string;
     name: string;
+    primaryMuscleGroup: string;
     targetSets: number;
     repsMin: number;
     repsMax: number | null;
@@ -99,6 +100,7 @@ export async function POST(req: NextRequest) {
           planExerciseId: pe.id,
           exerciseId: pe.exerciseId,
           name: names.de || names.en || "Übung",
+          primaryMuscleGroup: pe.exercise.primaryMuscleGroup ?? "full_body",
           targetSets: pe.sets,
           repsMin: pe.repsMin,
           repsMax: pe.repsMax ?? null,

@@ -20,6 +20,7 @@ export type WorkoutExercise = {
   planExerciseId: string | null;
   exerciseId: string;
   name: string;
+  primaryMuscleGroup: string;
   targetSets: number;
   repsMin: number;
   repsMax: number | null;
@@ -46,6 +47,7 @@ type WorkoutStore = {
 
   startWorkout: (workout: ActiveWorkout) => void;
   addExercise: (exercise: WorkoutExercise) => void;
+  replaceExercise: (exerciseIdx: number, exercise: WorkoutExercise) => void;
   addLoggedSet: (exerciseIdx: number, set: LoggedSet) => void;
   updateLoggedSet: (exerciseIdx: number, setLocalId: string, patch: Partial<LoggedSet>) => void;
   removeLoggedSet: (exerciseIdx: number, setLocalId: string) => void;
@@ -74,6 +76,15 @@ export const useWorkoutStore = create<WorkoutStore>()(
               exercises: [...state.activeWorkout.exercises, exercise],
             },
           };
+        }),
+
+      replaceExercise: (exerciseIdx, exercise) =>
+        set((state) => {
+          if (!state.activeWorkout) return state;
+          const exercises = state.activeWorkout.exercises.map((ex, i) =>
+            i === exerciseIdx ? exercise : ex
+          );
+          return { activeWorkout: { ...state.activeWorkout, exercises } };
         }),
 
       addLoggedSet: (exerciseIdx, loggedSet) =>

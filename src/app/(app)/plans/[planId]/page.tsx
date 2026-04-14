@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import type { CoachingSuggestion } from "@/lib/ai/coaching-suggestion-schema";
+import { ExerciseAlternativesModal, type ExerciseAlternative } from "@/components/exercise-alternatives-modal";
 import { useParams, useRouter } from "next/navigation";
 import {
   DndContext,
@@ -210,6 +211,7 @@ function SortableExRow({ ex, onChange, onRemove }: {
 }) {
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } =
     useSortable({ id: ex.uid });
+  const [showAltModal, setShowAltModal] = useState(false);
 
   const style = {
     transform: CSS.Transform.toString(transform),
@@ -232,7 +234,21 @@ function SortableExRow({ ex, onChange, onRemove }: {
     />
   );
 
+  function handleSelectAlternative(alt: ExerciseAlternative) {
+    onChange({
+      exerciseId: alt.exerciseId,
+      exerciseName: alt.exerciseName,
+      primaryMuscleGroup: alt.primaryMuscleGroup,
+      sets: alt.sets,
+      repsMin: alt.repsMin,
+      repsMax: alt.repsMax ?? "",
+      suggestedWeightKg: alt.suggestedWeightKg ?? "",
+    });
+    setShowAltModal(false);
+  }
+
   return (
+    <>
     <div ref={setNodeRef} style={style} className="rounded-lg bg-surface-container p-3 flex flex-col gap-2">
       <div className="flex items-center gap-2">
         {/* Drag handle */}
@@ -248,6 +264,13 @@ function SortableExRow({ ex, onChange, onRemove }: {
         <span className="shrink-0 text-xs font-mono text-on-surface-variant/50">
           {MUSCLE_LABELS[ex.primaryMuscleGroup] ?? ex.primaryMuscleGroup}
         </span>
+        <button
+          onClick={() => setShowAltModal(true)}
+          className="shrink-0 text-xs font-mono text-secondary/70 hover:text-secondary transition-colors px-1"
+          title="KI-Alternative vorschlagen"
+        >
+          ⇄
+        </button>
         <button onClick={onRemove} className="text-xs text-on-surface-variant/40 hover:text-error transition-colors px-1">✕</button>
       </div>
       <div className="grid grid-cols-5 gap-2">
@@ -280,6 +303,20 @@ function SortableExRow({ ex, onChange, onRemove }: {
         className="w-full rounded-md bg-surface-container-highest px-3 py-1.5 text-xs text-on-surface placeholder:text-on-surface-variant/40 outline-none focus:bg-surface-bright transition-colors"
       />
     </div>
+    {showAltModal && (
+      <ExerciseAlternativesModal
+        exerciseId={ex.exerciseId}
+        exerciseName={ex.exerciseName}
+        primaryMuscleGroup={ex.primaryMuscleGroup}
+        sets={typeof ex.sets === "number" ? ex.sets : 3}
+        repsMin={typeof ex.repsMin === "number" ? ex.repsMin : 8}
+        repsMax={typeof ex.repsMax === "number" ? ex.repsMax : null}
+        suggestedWeightKg={typeof ex.suggestedWeightKg === "number" ? ex.suggestedWeightKg : null}
+        onSelect={handleSelectAlternative}
+        onClose={() => setShowAltModal(false)}
+      />
+    )}
+    </>
   );
 }
 
@@ -744,7 +781,7 @@ export default function PlanDetailPage() {
     <div className="h-full overflow-y-auto">
       {/* Sticky header */}
       <div className="sticky top-0 z-10 border-b border-outline-variant/10 bg-surface/90 backdrop-blur-sm px-6 py-4">
-        <div className="max-w-2xl mx-auto flex items-center gap-3">
+        <div className="max-w-4xl mx-auto flex items-center gap-3">
           <button
             onClick={() => (editMode ? cancelEdit() : router.push("/plans"))}
             className="text-xs font-mono text-on-surface-variant hover:text-on-surface transition-colors"
@@ -772,7 +809,7 @@ export default function PlanDetailPage() {
         </div>
       </div>
 
-      <div className="max-w-2xl mx-auto px-6 py-6 flex flex-col gap-5 pb-24">
+      <div className="max-w-4xl mx-auto px-6 py-6 flex flex-col gap-5 pb-24">
 
         {/* Read mode: status + stats */}
         {!editMode && (
