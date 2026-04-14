@@ -9,6 +9,7 @@ import { useLocaleStore } from "@/stores/locale-store";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
 
 const NAV_ITEMS = [
+  { href: "/dashboard",       label: "Home",          labelEn: "Home",        icon: "⊞" },
   { href: "/coach",           label: "AI Coach",      labelEn: "AI Coach",    icon: "◈" },
   { href: "/plans",           label: "Pläne",         labelEn: "Plans",       icon: "▦" },
   { href: "/calendar",        label: "Kalender",      labelEn: "Calendar",    icon: "▣" },
