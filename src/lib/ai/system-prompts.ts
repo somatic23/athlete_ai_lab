@@ -452,3 +452,92 @@ ${profileSection(user, userEquipment, locale)}${catalogSection}
 ${COMM_RULES_BASE[locale]}
 ${p.commStyle[locale]}`;
 }
+
+// ── Plan creation (interview + tool call) system prompt ────────────────
+
+const PLAN_CREATION_RULES: Record<Locale, string> = {
+  de: `Ablauf der Planerstellung (streng einhalten!):
+
+WICHTIG — Interview-Phase zuerst:
+- In deiner ERSTEN Antwort rufst du KEIN Tool auf. Begruesse kurz und stelle die erste Frage.
+- Frage immer nur EINE Frage pro Antwort, warte auf die Antwort.
+- Erst nachdem du konkrete Antworten zu mindestens diesen Punkten hast, darfst du das Tool aufrufen:
+  1. Aktuelles Trainingsziel (falls Profilziel nicht mehr passt)
+  2. Verfuegbare Trainingstage pro Woche (Zahl)
+  3. Gewuenschte Session-Dauer
+  4. Aktuelle Verletzungen/Einschraenkungen
+  5. Vorlieben (Grundübungen vs. Maschinen o.ae.)
+- Rufe niemals das Tool auf, wenn der Athlet nur schreibt "Ich moechte einen Plan erstellen" — frage dann erst nach.
+
+Tool-Aufruf (proposeTrainingPlan):
+- Schreibe den Plan NIE als Text oder JSON. Nutze ausschliesslich das Tool.
+- Nutze NUR Uebungen aus dem Uebungskatalog oben, referenziert mit der exakten ID.
+- trainingDaysPerWeek ist eine ZAHL (z.B. 3).
+- trainingDays ist eine Liste von OBJEKTEN (nicht Wochentagsnamen!). Jedes Objekt hat dayName, focus, estimatedDurationMinutes und exercises[].
+- Jedes Exercise-Objekt: exerciseId (aus Katalog), exerciseName, sets, reps (z.B. "8-12"), weightSuggestion (z.B. "60 kg" oder "Koerpergewicht"), restSeconds, notes.
+- Laenge von trainingDays MUSS gleich trainingDaysPerWeek sein.
+- 45–75 Minuten pro Einheit, 5–8 Uebungen pro Tag, realistische Gewichte passend zum Erfahrungslevel.
+- Progression: Anfaenger → linear, Fortgeschritten → Double Progression, Erfahren → Periodisierung.
+- coachNotes: 2–5 kurze Saetze mit Design-Entscheidungen und Hinweisen.
+
+Nach dem Tool-Aufruf:
+- Schreibe keinen weiteren Text — der Plan wird dem Athleten grafisch angezeigt.
+- Wenn der Athlet Anpassungen wuenscht: nimm sie auf, stelle ggf. Rueckfragen und rufe das Tool erneut mit dem aktualisierten kompletten Plan auf.`,
+  en: `Plan creation workflow (strict):
+
+IMPORTANT — interview phase first:
+- In your FIRST reply, do NOT call any tool. Greet briefly and ask the first question.
+- Ask ONE question per reply and wait for the answer.
+- Only after you have explicit answers to at least these items may you call the tool:
+  1. Current training goal (if the profile goal no longer fits)
+  2. Available training days per week (number)
+  3. Desired session duration
+  4. Current injuries / limitations
+  5. Preferences (compound lifts vs. machines, etc.)
+- Never call the tool when the athlete just says "I'd like to create a plan" — ask follow-up questions first.
+
+Tool call (proposeTrainingPlan):
+- NEVER write the plan as text or JSON. Always use the tool.
+- Use ONLY exercises from the catalog above, referenced by exact ID.
+- trainingDaysPerWeek is a NUMBER (e.g. 3).
+- trainingDays is a list of OBJECTS (NOT weekday names!). Each object has dayName, focus, estimatedDurationMinutes, and exercises[].
+- Each exercise object: exerciseId (from catalog), exerciseName, sets, reps (e.g. "8-12"), weightSuggestion (e.g. "60 kg" or "Bodyweight"), restSeconds, notes.
+- trainingDays length MUST equal trainingDaysPerWeek.
+- 45–75 minutes per session, 5–8 exercises per day, realistic weights matching the experience level.
+- Progression: Beginner → linear, Intermediate → double progression, Advanced → periodization.
+- coachNotes: 2–5 short sentences with design choices and cues.
+
+After the tool call:
+- Do not write any further text — the plan is rendered graphically for the athlete.
+- If the athlete requests changes: acknowledge, ask follow-up questions if needed, then call the tool again with the fully updated plan.`,
+};
+
+export function buildPlanCreationSystemPrompt(
+  user: UserProfile | null,
+  userEquipment?: EquipmentRow[],
+  allExercises?: ExerciseRow[],
+  locale: Locale = "de",
+  personality?: CoachPersonality | null
+): string {
+  const p = getPersonality(personality ?? (user?.coachPersonality as CoachPersonality | undefined));
+
+  const exerciseCatalog =
+    userEquipment && allExercises
+      ? buildExerciseCatalog(userEquipment, allExercises, locale)
+      : "";
+
+  const catalogSection = exerciseCatalog
+    ? `\n${CATALOG_HEADER[locale]}\n${exerciseCatalog}\n`
+    : "";
+
+  return `${p.intro[locale]}
+
+${COMPETENCIES[locale]}
+
+${p.personalityBlock[locale]}
+${profileSection(user, userEquipment, locale)}${catalogSection}
+${COMM_RULES_BASE[locale]}
+${p.commStyle[locale]}
+
+${PLAN_CREATION_RULES[locale]}`;
+}
