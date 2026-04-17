@@ -10,7 +10,7 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         className="pointer-events-none absolute bottom-0 right-0 h-64 w-64 rounded-full opacity-5 blur-3xl"
         style={{ background: "var(--secondary)" }}
       />
-      <div className="relative z-10 w-full px-4">
+      <div className="relative z-10 w-150 px-4">
         <div className="mb-8 text-center">
           <h1 className="font-headline text-2xl font-bold tracking-tight text-primary">
             ATHLETE AI LAB

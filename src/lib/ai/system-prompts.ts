@@ -1,6 +1,8 @@
 import type { equipment, exercises, users } from "@/db/schema";
 import { parseI18n } from "@/lib/utils/i18n";
 import { calculateAge } from "@/lib/utils/age";
+import { getPersonality } from "@/lib/coach-personalities";
+import type { CoachPersonality } from "@/lib/coach-personalities";
 
 type UserProfile = typeof users.$inferSelect;
 type EquipmentRow = typeof equipment.$inferSelect;
@@ -386,65 +388,51 @@ OUTPUT SCHEMA (alle Felder befüllen, keine nulls):
 
 // ── Coach system prompt ────────────────────────────────────────────────
 
-const COACH_PROMPTS: Record<Locale, {
-  intro: string; competencies: string; personality: string;
-  catalogHeader: string; commRules: (locale: Locale) => string;
-}> = {
-  de: {
-    intro: `Du bist "Atlas", ein erfahrener und wissenschaftlich fundierter Krafttraining-Coach.`,
-    competencies: `Deine Kernkompetenzen:
+const COMPETENCIES: Record<Locale, string> = {
+  de: `Deine Kernkompetenzen:
 - Periodisierung und Programmdesign (Linear, DUP, Block)
 - Biomechanik und Technikoptimierung
 - Ernaehrungsprinzipien fuer Kraft- und Hypertrophieziele
 - Verletzungspraevention und Rehab-Grundlagen
 - Leistungsdiagnostik (RPE, 1RM-Schaetzung, Progressionsmodelle)`,
-    personality: `Deine Persoenlichkeit:
-- Sachlich, praezise, evidenzbasiert
-- Motivierend ohne Floskeln
-- Direkt und umsetzbar in deinen Empfehlungen
-- Sicherheitsbewusst — Verletzungspraevention hat immer Vorrang`,
-    catalogHeader: `Übungskatalog (nutze ausschließlich diese Übungen und referenziere sie mit der exakten ID)`,
-    commRules: () => `Kommunikationsregeln:
-- Interview Format, stelle immer nur eine Frage und warte auf die Antwort
-- Antworte IMMER auf Deutsch, unabhängig von der Sprache des Users
-- Verwende Fachbegriffe praezise, erklaere sie bei Bedarf kurz
-- Beziehe dich auf das Athleten-Profil, wenn es relevant ist
-- Halte Antworten strukturiert (Aufzaehlungen, kurze Absaetze)
-- Frage zuerst, ob die übermittelten Angaben aus dem Profil (vor allem das Trainingsziel) noch aktuell sind
-- Wenn du dir bei etwas unsicher bist, sage es klar`,
-  },
-  en: {
-    intro: `You are "Atlas", an experienced, science-based strength training coach.`,
-    competencies: `Your core competencies:
+  en: `Your core competencies:
 - Periodization and program design (Linear, DUP, Block)
 - Biomechanics and technique optimization
 - Nutrition principles for strength and hypertrophy goals
 - Injury prevention and rehabilitation basics
 - Performance diagnostics (RPE, 1RM estimation, progression models)`,
-    personality: `Your personality:
-- Objective, precise, evidence-based
-- Motivating without hollow phrases
-- Direct and actionable in your recommendations
-- Safety-conscious — injury prevention always comes first`,
-    catalogHeader: `Exercise Catalog (use ONLY these exercises, reference by exact ID)`,
-    commRules: () => `Communication rules:
+};
+
+const CATALOG_HEADER: Record<Locale, string> = {
+  de: `Übungskatalog (nutze ausschließlich diese Übungen und referenziere sie mit der exakten ID)`,
+  en: `Exercise Catalog (use ONLY these exercises, reference by exact ID)`,
+};
+
+const COMM_RULES_BASE: Record<Locale, string> = {
+  de: `Kommunikationsregeln:
+- Interview Format, stelle immer nur eine Frage und warte auf die Antwort
+- Verwende Fachbegriffe praezise, erklaere sie bei Bedarf kurz
+- Beziehe dich auf das Athleten-Profil, wenn es relevant ist
+- Halte Antworten strukturiert (Aufzaehlungen, kurze Absaetze)
+- Frage zuerst, ob die übermittelten Angaben aus dem Profil (vor allem das Trainingsziel) noch aktuell sind
+- Wenn du dir bei etwas unsicher bist, sage es klar`,
+  en: `Communication rules:
 - Interview format: ask only one question at a time and wait for the answer
-- ALWAYS respond in English, regardless of the language the user writes in
 - Use technical terms precisely, explain briefly when needed
 - Reference the athlete profile when relevant
 - Keep answers structured (bullet points, short paragraphs)
 - First ask whether the profile data (especially training goal) is still up to date
 - If you are unsure about something, state it clearly`,
-  },
 };
 
 export function buildCoachSystemPrompt(
   user: UserProfile | null,
   userEquipment?: EquipmentRow[],
   allExercises?: ExerciseRow[],
-  locale: Locale = "de"
+  locale: Locale = "de",
+  personality?: CoachPersonality | null
 ): string {
-  const P = COACH_PROMPTS[locale];
+  const p = getPersonality(personality ?? (user?.coachPersonality as CoachPersonality | undefined));
 
   const exerciseCatalog =
     userEquipment && allExercises
@@ -452,14 +440,15 @@ export function buildCoachSystemPrompt(
       : "";
 
   const catalogSection = exerciseCatalog
-    ? `\n${P.catalogHeader}\n${exerciseCatalog}\n`
+    ? `\n${CATALOG_HEADER[locale]}\n${exerciseCatalog}\n`
     : "";
 
-  return `${P.intro}
+  return `${p.intro[locale]}
 
-${P.competencies}
+${COMPETENCIES[locale]}
 
-${P.personality}
+${p.personalityBlock[locale]}
 ${profileSection(user, userEquipment, locale)}${catalogSection}
-${P.commRules(locale)}`;
+${COMM_RULES_BASE[locale]}
+${p.commStyle[locale]}`;
 }

@@ -126,7 +126,7 @@ export default function CoachPage() {
       <div className="shrink-0 border-t border-outline-variant/10 bg-surface/80 px-4 py-4 backdrop-blur-sm">
         <form
           onSubmit={handleSubmit}
-          className="mx-auto flex max-w-2xl items-end gap-3"
+          className="mx-auto flex max-w-4xl items-end gap-3"
         >
           <textarea
             ref={textareaRef}

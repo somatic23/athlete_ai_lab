@@ -17,6 +17,7 @@ const onboardingSchema = z.object({
     .optional(),
   injuriesLimitations: z.string().optional(),
   equipmentIds: z.array(z.string()).optional(),
+  coachPersonality: z.enum(["atlas", "kai", "mira", "sarge", "rex"]).optional(),
 });
 
 export async function POST(req: NextRequest) {

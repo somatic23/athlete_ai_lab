@@ -48,7 +48,7 @@ export default function RegisterPage() {
     });
 
     if (!res.ok) {
-      const err = await res.json();
+      const err = await res.json().catch(() => ({}));
       setServerError(
         err.error === "Email already registered"
           ? "Diese E-Mail ist bereits registriert"

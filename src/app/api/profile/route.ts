@@ -18,6 +18,7 @@ const profileSchema = z.object({
   goals: z.string().max(1000).nullable().optional(),
   injuriesLimitations: z.string().max(1000).nullable().optional(),
   preferredLocale: z.enum(["de", "en"]).optional(),
+  coachPersonality: z.enum(["atlas", "kai", "mira", "sarge", "rex"]).optional(),
   equipmentIds: z.array(z.string()).optional(),
 });
 
@@ -39,7 +40,7 @@ export async function GET() {
       id: true, email: true, displayName: true,
       birthDate: true, gender: true, weightKg: true, heightCm: true,
       bodyFatPct: true, experienceLevel: true, goals: true,
-      injuriesLimitations: true, preferredLocale: true, createdAt: true,
+      injuriesLimitations: true, preferredLocale: true, coachPersonality: true, avatarUrl: true, createdAt: true,
     },
   });
 

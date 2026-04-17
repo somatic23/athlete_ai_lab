@@ -27,6 +27,8 @@ export const users = sqliteTable("users", {
   }),
   injuriesLimitations: text("injuries_limitations"),
   preferredLocale: text("preferred_locale").$type<"de" | "en">().notNull().default("de"),
+  coachPersonality: text("coach_personality").$type<import("@/lib/coach-personalities").CoachPersonality>().notNull().default("atlas"),
+  avatarUrl: text("avatar_url"),
   onboardingCompleted: integer("onboarding_completed", { mode: "boolean" })
     .notNull()
     .default(false),

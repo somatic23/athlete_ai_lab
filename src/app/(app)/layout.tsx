@@ -1,8 +1,9 @@
 "use client";
 
 import { usePathname } from "next/navigation";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { signOut } from "next-auth/react";
 import { cn } from "@/lib/utils/cn";
 import { useLocaleStore } from "@/stores/locale-store";
@@ -20,12 +21,15 @@ const NAV_ITEMS = [
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { locale, setLocale } = useLocaleStore();
+  const [userMeta, setUserMeta] = useState<{ displayName: string; avatarUrl: string | null } | null>(null);
 
-  // Sync locale from user profile once on mount
   useEffect(() => {
     fetch("/api/profile")
       .then((r) => r.json())
-      .then((p) => { if (p.preferredLocale) setLocale(p.preferredLocale); })
+      .then((p) => {
+        if (p.preferredLocale) setLocale(p.preferredLocale);
+        setUserMeta({ displayName: p.displayName ?? "", avatarUrl: p.avatarUrl ?? null });
+      })
       .catch(() => {});
   }, [setLocale]);
 
@@ -64,19 +68,40 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
           </ul>
         </nav>
 
-        <div className="flex flex-col gap-1 px-5 py-5 border-t border-outline-variant/10">
+        <div className="border-t border-outline-variant/10 px-3 py-3">
           <Link
             href="/settings"
             className={cn(
-              "text-xs transition-colors py-1",
-              pathname === "/settings" ? "text-primary" : "text-on-surface-variant hover:text-on-surface"
+              "flex items-center gap-3 rounded-lg px-2 py-2 transition-all",
+              pathname === "/settings"
+                ? "bg-primary-container/20 text-primary"
+                : "text-on-surface-variant hover:bg-surface-container hover:text-on-surface"
             )}
           >
-            {locale === "en" ? "Settings" : "Einstellungen"}
+            <div className="h-8 w-8 shrink-0 rounded-full overflow-hidden bg-surface-container-high flex items-center justify-center">
+              {userMeta?.avatarUrl ? (
+                <Image
+                  src={userMeta.avatarUrl}
+                  alt=""
+                  width={32}
+                  height={32}
+                  className="h-full w-full object-cover"
+                  unoptimized
+                />
+              ) : (
+                <span className="text-xs font-bold text-on-surface-variant select-none">
+                  {userMeta?.displayName?.[0]?.toUpperCase() ?? "?"}
+                </span>
+              )}
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-medium truncate">{userMeta?.displayName ?? ""}</p>
+              <p className="text-[10px] text-on-surface-variant/60">{locale === "en" ? "Settings" : "Einstellungen"}</p>
+            </div>
           </Link>
           <button
             onClick={() => signOut({ redirectTo: "/login" })}
-            className="text-left text-xs text-on-surface-variant/60 hover:text-error transition-colors py-1"
+            className="mt-1 w-full text-left rounded-lg px-2 py-1.5 text-xs text-on-surface-variant/60 hover:text-error hover:bg-error/5 transition-all"
           >
             {locale === "en" ? "Sign out" : "Abmelden"}
           </button>

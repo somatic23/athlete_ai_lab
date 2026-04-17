@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { useSession } from "next-auth/react";
+import { useSession, signOut } from "next-auth/react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -13,6 +13,7 @@ import {
   EQUIPMENT_CATEGORY_LABELS,
   type EquipmentCategory,
 } from "@/lib/equipment-categories";
+import { PERSONALITY_DEFS, type CoachPersonality } from "@/lib/coach-personalities";
 
 const schema = z.object({
   birthDate: z.string().optional(),
@@ -36,6 +37,7 @@ const STEPS = [
   { id: 1, label: "Persoenlich", title: "Persoenliche Daten" },
   { id: 2, label: "Equipment", title: "Dein Equipment" },
   { id: 3, label: "Ziele", title: "Ziele & Einschraenkungen" },
+  { id: 4, label: "Coach", title: "Dein Coach-Stil" },
 ];
 
 const EXPERIENCE_OPTIONS = [
@@ -59,6 +61,7 @@ export default function OnboardingPage() {
   const [equipment, setEquipment] = useState<Equipment[]>([]);
   const [selectedEquipment, setSelectedEquipment] = useState<string[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [selectedPersonality, setSelectedPersonality] = useState<CoachPersonality>("atlas");
 
   const { register, watch, setValue, getValues, formState: { errors } } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -82,7 +85,7 @@ export default function OnboardingPage() {
   };
 
   const handleNext = () => {
-    if (step < 3) setStep((s) => s + 1);
+    if (step < 4) setStep((s) => s + 1);
   };
 
   const handleBack = () => {
@@ -104,7 +107,7 @@ export default function OnboardingPage() {
       const res = await fetch("/api/onboarding", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...sanitize(data as Record<string, unknown>), equipmentIds: selectedEquipment }),
+        body: JSON.stringify({ ...sanitize(data as Record<string, unknown>), equipmentIds: selectedEquipment, coachPersonality: selectedPersonality }),
       });
 
       if (!res.ok) {
@@ -154,7 +157,7 @@ export default function OnboardingPage() {
               </div>
             )}
             <button
-              onClick={() => { window.location.href = "/coach"; }}
+              onClick={() => signOut({ redirectTo: "/login" })}
               className="mt-2 w-full rounded-md bg-primary-container px-5 py-3 font-headline text-sm font-medium uppercase tracking-wide text-on-primary transition-all hover:opacity-90 active:scale-95"
             >
               Los geht&apos;s →
@@ -381,6 +384,36 @@ export default function OnboardingPage() {
             </div>
           )}
 
+          {/* Step 4: Coach Personality */}
+          {step === 4 && (
+            <div className="flex flex-col gap-3">
+              <p className="text-sm text-on-surface-variant mb-2">
+                Wähle den Coaching-Stil, der am besten zu dir passt.
+              </p>
+              {PERSONALITY_DEFS.map((p) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  onClick={() => setSelectedPersonality(p.id)}
+                  className={cn(
+                    "rounded-lg px-4 py-3 text-left transition-all border-2",
+                    selectedPersonality === p.id
+                      ? "border-primary bg-primary-container/15 text-on-surface"
+                      : "border-transparent bg-surface-container-high text-on-surface hover:bg-surface-container-highest"
+                  )}
+                >
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-semibold">{p.label}</p>
+                    {selectedPersonality === p.id && (
+                      <span className="text-primary text-sm font-bold">✓</span>
+                    )}
+                  </div>
+                  <p className="text-xs text-on-surface-variant mt-0.5">{p.tagline}</p>
+                </button>
+              ))}
+            </div>
+          )}
+
           {/* Step 3: Goals & Injuries */}
           {step === 3 && (
             <div className="flex flex-col gap-4">
@@ -438,7 +471,7 @@ export default function OnboardingPage() {
             >
               Zurueck
             </Button>
-            {step < 3 ? (
+            {step < 4 ? (
               <Button type="button" onClick={handleNext}>
                 Weiter
               </Button>

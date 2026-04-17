@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils/cn";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { calculateAge } from "@/lib/utils/age";
+import Image from "next/image";
 import { useLocaleStore, type AppLocale } from "@/stores/locale-store";
 import { useToast } from "@/stores/toast-store";
 import {
@@ -12,6 +13,7 @@ import {
   EQUIPMENT_CATEGORY_LABELS,
   type EquipmentCategory,
 } from "@/lib/equipment-categories";
+import { PERSONALITY_DEFS, type CoachPersonality } from "@/lib/coach-personalities";
 
 // ── Types ──────────────────────────────────────────────────────────────
 
@@ -28,6 +30,8 @@ type Profile = {
   goals: string | null;
   injuriesLimitations: string | null;
   preferredLocale: AppLocale;
+  coachPersonality: CoachPersonality;
+  avatarUrl: string | null;
   equipmentIds: string[];
 };
 
@@ -147,6 +151,16 @@ export default function SettingsPage() {
   const [pwError, setPwError] = useState<string | null>(null);
   const [pwSuccess, setPwSuccess] = useState(false);
 
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarError, setAvatarError] = useState<string | null>(null);
+
+  const [selectedPersonality, setSelectedPersonality] = useState<CoachPersonality>("atlas");
+  const [personalityDirty, setPersonalityDirty] = useState(false);
+  const [personalitySaving, setPersonalitySaving] = useState(false);
+  const [personalityError, setPersonalityError] = useState<string | null>(null);
+  const [personalitySuccess, setPersonalitySuccess] = useState(false);
+
   // Load profile + equipment catalog
   const loadProfile = useCallback(async () => {
     const [profileRes, catalogRes] = await Promise.all([
@@ -171,6 +185,8 @@ export default function SettingsPage() {
       injuriesLimitations: p.injuriesLimitations ?? "",
     });
     setSelectedEquipment(p.equipmentIds);
+    setSelectedPersonality(p.coachPersonality ?? "atlas");
+    setAvatarUrl(p.avatarUrl ?? null);
     setLoading(false);
   }, []);
 
@@ -372,6 +388,76 @@ export default function SettingsPage() {
     setPwSaving(false);
   }
 
+  // ── Avatar section ────────────────────────────────────────────────────
+
+  async function handleAvatarChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setAvatarUploading(true);
+    setAvatarError(null);
+    const fd = new FormData();
+    fd.append("file", file);
+    const res = await fetch("/api/profile/avatar", { method: "POST", body: fd });
+    const data = await res.json();
+    if (!res.ok) {
+      setAvatarError(data.error ?? "Upload fehlgeschlagen");
+    } else {
+      setAvatarUrl(data.avatarUrl);
+      toast.success("Profilbild gespeichert");
+    }
+    setAvatarUploading(false);
+    e.target.value = "";
+  }
+
+  async function handleAvatarDelete() {
+    setAvatarUploading(true);
+    setAvatarError(null);
+    const res = await fetch("/api/profile/avatar", { method: "DELETE" });
+    if (res.ok) {
+      setAvatarUrl(null);
+      toast.success("Profilbild entfernt");
+    } else {
+      setAvatarError("Löschen fehlgeschlagen");
+    }
+    setAvatarUploading(false);
+  }
+
+  // ── Coach personality section ─────────────────────────────────────────
+
+  function handlePersonalityChange(p: CoachPersonality) {
+    setSelectedPersonality(p);
+    setPersonalityDirty(p !== (profile?.coachPersonality ?? "atlas"));
+    setPersonalitySuccess(false);
+    setPersonalityError(null);
+  }
+
+  function resetPersonality() {
+    setSelectedPersonality(profile?.coachPersonality ?? "atlas");
+    setPersonalityDirty(false);
+    setPersonalityError(null);
+    setPersonalitySuccess(false);
+  }
+
+  async function savePersonality() {
+    setPersonalitySaving(true);
+    setPersonalityError(null);
+    const res = await fetch("/api/profile", {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ coachPersonality: selectedPersonality }),
+    });
+    const data = await res.json();
+    if (!res.ok) {
+      setPersonalityError(data.error ?? "Fehler beim Speichern");
+    } else {
+      setPersonalityDirty(false);
+      setPersonalitySuccess(true);
+      toast.success("Coach-Stil gespeichert");
+      setProfile((p) => p ? { ...p, coachPersonality: selectedPersonality } : p);
+    }
+    setPersonalitySaving(false);
+  }
+
   // ── Render ─────────────────────────────────────────────────────────
 
   if (loading) {
@@ -390,6 +476,66 @@ export default function SettingsPage() {
           <h1 className="font-headline text-2xl font-bold text-on-surface">Einstellungen</h1>
           <p className="text-sm text-on-surface-variant mt-1">Athleten-Profil und Konto verwalten</p>
         </div>
+
+        {/* ── Profilbild ── */}
+        <section>
+          <SectionTitle>Profilbild</SectionTitle>
+          <div className="rounded-xl bg-surface-container p-5">
+            <div className="flex items-center gap-5">
+              <div className="relative shrink-0">
+                <div className="h-20 w-20 rounded-full overflow-hidden bg-surface-container-high flex items-center justify-center">
+                  {avatarUrl ? (
+                    <Image
+                      src={avatarUrl}
+                      alt="Profilbild"
+                      width={80}
+                      height={80}
+                      className="h-full w-full object-cover"
+                      unoptimized
+                    />
+                  ) : (
+                    <span className="text-2xl font-bold text-on-surface-variant select-none">
+                      {profile?.displayName?.[0]?.toUpperCase() ?? "?"}
+                    </span>
+                  )}
+                </div>
+                {avatarUploading && (
+                  <div className="absolute inset-0 flex items-center justify-center rounded-full bg-surface/60">
+                    <span className="text-xs text-on-surface-variant animate-pulse">…</span>
+                  </div>
+                )}
+              </div>
+              <div className="flex flex-col gap-2">
+                <label className={cn(
+                  "cursor-pointer rounded-lg px-4 py-2 text-sm font-medium transition-all text-center",
+                  avatarUploading
+                    ? "opacity-50 pointer-events-none bg-surface-container-high text-on-surface-variant"
+                    : "bg-primary-container text-on-primary hover:opacity-90"
+                )}>
+                  {avatarUrl ? "Bild ändern" : "Bild hochladen"}
+                  <input
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className="sr-only"
+                    onChange={handleAvatarChange}
+                    disabled={avatarUploading}
+                  />
+                </label>
+                {avatarUrl && (
+                  <button
+                    onClick={handleAvatarDelete}
+                    disabled={avatarUploading}
+                    className="rounded-lg px-4 py-2 text-sm font-medium text-error hover:bg-error/10 transition-all disabled:opacity-50"
+                  >
+                    Entfernen
+                  </button>
+                )}
+                <p className="text-xs text-on-surface-variant/60">JPEG, PNG oder WebP · max. 3 MB</p>
+              </div>
+            </div>
+            {avatarError && <p className="mt-3 text-xs text-error">{avatarError}</p>}
+          </div>
+        </section>
 
         {/* ── Sprache ── */}
         <section>
@@ -437,6 +583,42 @@ export default function SettingsPage() {
             success={localeSuccess}
             onSave={saveLocale}
             onReset={resetLocale}
+          />
+        </section>
+
+        {/* ── Coach-Stil ── */}
+        <section>
+          <SectionTitle>Coach-Persoenlichkeit</SectionTitle>
+          <div className="flex flex-col gap-2">
+            {PERSONALITY_DEFS.map((p) => (
+              <button
+                key={p.id}
+                type="button"
+                onClick={() => handlePersonalityChange(p.id)}
+                className={cn(
+                  "rounded-xl border-2 px-4 py-3 text-left transition-all",
+                  selectedPersonality === p.id
+                    ? "border-primary bg-primary-container/15 text-on-surface"
+                    : "border-transparent bg-surface-container text-on-surface hover:bg-surface-container-high"
+                )}
+              >
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold">{p.label}</p>
+                  {selectedPersonality === p.id && (
+                    <span className="text-primary text-sm font-bold">✓</span>
+                  )}
+                </div>
+                <p className="text-xs text-on-surface-variant mt-0.5">{p.tagline}</p>
+              </button>
+            ))}
+          </div>
+          <SaveBar
+            dirty={personalityDirty}
+            saving={personalitySaving}
+            error={personalityError}
+            success={personalitySuccess}
+            onSave={savePersonality}
+            onReset={resetPersonality}
           />
         </section>
 
