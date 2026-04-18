@@ -121,6 +121,11 @@ const OUTCOMES: SetOutcomeOption[] = [
 ];
 
 const RPE_OPTIONS = [6, 6.5, 7, 7.5, 8, 8.5, 9, 9.5, 10];
+const RIR_OPTIONS = [0, 1, 2, 3, 4];
+
+function rirToRpe(rir: number): number {
+  return 10 - rir;
+}
 
 // ── Stopwatch ─────────────────────────────────────────────────────────
 
@@ -198,13 +203,17 @@ function SetInputForm({
   const [outcome, setOutcome] = useState<SetOutcome>("completed");
   const [notes, setNotes] = useState("");
   const [showNotes, setShowNotes] = useState(false);
+  const [inputMode, setInputMode] = useState<"rpe" | "rir">("rpe");
+  const [rirValue, setRirValue] = useState<number | null>(null);
 
   const wKg = parseFloat(weight) || null;
   const rNum = parseInt(reps) || null;
   const e1rm = wKg && rNum ? estimated1rm(wKg, rNum) : null;
 
   function handleLog() {
-    onLog({ setNumber, weightKg: wKg, repsCompleted: rNum, rpe, outcome, notes, estimated1rm: e1rm ?? undefined });
+    const resolvedRpe = inputMode === "rir" && rirValue !== null ? rirToRpe(rirValue) : rpe;
+    setRirValue(null);
+    onLog({ setNumber, weightKg: wKg, repsCompleted: rNum, rpe: resolvedRpe, outcome, notes, estimated1rm: e1rm ?? undefined });
   }
 
   return (
@@ -266,27 +275,65 @@ function SetInputForm({
         </div>
       </div>
 
-      {/* RPE */}
+      {/* RPE / RIR */}
       <div className="flex flex-col gap-1.5">
-        <label className="text-xs font-mono text-on-surface-variant/60 uppercase">
-          RPE {rpe != null ? rpe : "— (optional)"}
-        </label>
-        <div className="flex gap-1.5 flex-wrap">
-          {RPE_OPTIONS.map((r) => (
+        <div className="flex items-center justify-between">
+          <span className="text-xs font-mono text-on-surface-variant/60 uppercase">
+            {inputMode === "rpe"
+              ? `RPE ${rpe != null ? rpe : "— (optional)"}`
+              : `RIR ${rirValue != null ? rirValue : "— (optional)"}`}
+          </span>
+          <div className="seg">
             <button
-              key={r}
-              onClick={() => setRpe(rpe === r ? null : r)}
-              className={cn(
-                "flex-1 min-w-[2.5rem] rounded-lg py-1.5 text-sm font-mono transition-all",
-                rpe === r
-                  ? "bg-primary/20 text-primary"
-                  : "bg-surface-container-high text-on-surface-variant/50 hover:text-on-surface-variant"
-              )}
-            >
-              {r}
-            </button>
-          ))}
+              type="button"
+              className={cn(inputMode === "rpe" && "on")}
+              onClick={() => { setInputMode("rpe"); setRirValue(null); }}
+            >RPE</button>
+            <button
+              type="button"
+              className={cn(inputMode === "rir" && "on")}
+              onClick={() => { setInputMode("rir"); setRpe(null); }}
+            >RIR</button>
+          </div>
         </div>
+        {inputMode === "rpe" ? (
+          <div className="flex gap-1.5 flex-wrap">
+            {RPE_OPTIONS.map((r) => (
+              <button
+                key={r}
+                type="button"
+                onClick={() => setRpe(rpe === r ? null : r)}
+                className={cn(
+                  "flex-1 min-w-[2.5rem] rounded-lg py-1.5 text-sm font-mono transition-all",
+                  rpe === r
+                    ? "bg-primary/20 text-primary"
+                    : "bg-surface-container-high text-on-surface-variant/50 hover:text-on-surface-variant"
+                )}
+              >
+                {r}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="flex gap-1.5 flex-wrap items-center">
+            {RIR_OPTIONS.map((r) => (
+              <button
+                key={r}
+                type="button"
+                onClick={() => setRirValue(rirValue === r ? null : r)}
+                className={cn(
+                  "flex-1 min-w-[2.5rem] rounded-lg py-1.5 text-sm font-mono transition-all",
+                  rirValue === r
+                    ? "bg-secondary/20 text-secondary"
+                    : "bg-surface-container-high text-on-surface-variant/50 hover:text-on-surface-variant"
+                )}
+              >
+                {r}
+              </button>
+            ))}
+            <span className="text-xs font-mono text-on-surface-variant/40 ml-1 shrink-0">Wdh. übrig</span>
+          </div>
+        )}
       </div>
 
       {/* Notes toggle */}
