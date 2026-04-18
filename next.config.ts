@@ -8,3 +8,8 @@ const nextConfig: NextConfig = {
 };
 
 export default withNextIntl(nextConfig);
+
+// next.config.js
+module.exports = {
+  allowedDevOrigins: ['192.168.178.202'],
+}
