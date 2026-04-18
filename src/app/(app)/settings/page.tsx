@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { cn } from "@/lib/utils/cn";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { calculateAge } from "@/lib/utils/age";
 import Image from "next/image";
@@ -84,12 +83,16 @@ function SaveBar({
 }) {
   if (!dirty && !success && !error) return null;
   return (
-    <div className="flex items-center gap-3 rounded-xl bg-surface-container px-4 py-3 mt-4">
-      {error && <span className="flex-1 text-xs text-error">{error}</span>}
-      {success && !error && <span className="flex-1 text-xs text-secondary">Gespeichert</span>}
-      {!error && !success && <span className="flex-1 text-xs text-on-surface-variant">Ungespeicherte Aenderungen</span>}
-      <Button variant="ghost" size="sm" onClick={onReset} disabled={saving}>Verwerfen</Button>
-      <Button size="sm" onClick={onSave} isLoading={saving}>Speichern</Button>
+    <div className="flex items-center gap-3 rounded-xl bg-surface-container border border-outline-variant/10 px-4 py-3 mt-3">
+      {error && <span className="flex-1 mono-text text-[11px] text-error">{error}</span>}
+      {success && !error && <span className="flex-1 mono-text text-[11px] text-secondary">● Gespeichert</span>}
+      {!error && !success && <span className="flex-1 mono-text text-[11px] text-on-surface-variant/60">○ Ungespeicherte Änderungen</span>}
+      <button onClick={onReset} disabled={saving} className="rounded-lg px-3 py-1.5 text-xs text-on-surface-variant hover:bg-surface-container-high transition-all disabled:opacity-40">
+        Verwerfen
+      </button>
+      <button onClick={onSave} disabled={saving} className="btn-liquid rounded-lg px-4 py-1.5 text-xs font-bold text-on-primary disabled:opacity-40">
+        {saving ? "…" : "Speichern"}
+      </button>
     </div>
   );
 }
@@ -480,10 +483,10 @@ export default function SettingsPage() {
         {/* ── Profilbild ── */}
         <section>
           <SectionTitle>Profilbild</SectionTitle>
-          <div className="rounded-xl bg-surface-container p-5">
+          <div className="rounded-xl bg-surface-container border border-outline-variant/10 p-5">
             <div className="flex items-center gap-5">
               <div className="relative shrink-0">
-                <div className="h-20 w-20 rounded-full overflow-hidden bg-surface-container-high flex items-center justify-center">
+                <div className="h-20 w-20 rounded-full overflow-hidden bg-surface-container-high flex items-center justify-center ring-2 ring-outline-variant/15">
                   {avatarUrl ? (
                     <Image
                       src={avatarUrl}
@@ -507,12 +510,12 @@ export default function SettingsPage() {
               </div>
               <div className="flex flex-col gap-2">
                 <label className={cn(
-                  "cursor-pointer rounded-lg px-4 py-2 text-sm font-medium transition-all text-center",
+                  "cursor-pointer rounded-lg px-4 py-2 text-sm font-bold text-center transition-all",
                   avatarUploading
-                    ? "opacity-50 pointer-events-none bg-surface-container-high text-on-surface-variant"
-                    : "bg-primary-container text-on-primary hover:opacity-90"
+                    ? "opacity-40 pointer-events-none bg-surface-container-high text-on-surface-variant"
+                    : "btn-liquid text-on-primary"
                 )}>
-                  {avatarUrl ? "Bild ändern" : "Bild hochladen"}
+                  {avatarUrl ? "Bild ändern" : "↑ Bild hochladen"}
                   <input
                     type="file"
                     accept="image/jpeg,image/png,image/webp"
@@ -530,7 +533,7 @@ export default function SettingsPage() {
                     Entfernen
                   </button>
                 )}
-                <p className="text-xs text-on-surface-variant/60">JPEG, PNG oder WebP · max. 3 MB</p>
+                <p className="caption">JPEG · PNG · WebP · max. 3 MB</p>
               </div>
             </div>
             {avatarError && <p className="mt-3 text-xs text-error">{avatarError}</p>}
@@ -540,11 +543,10 @@ export default function SettingsPage() {
         {/* ── Sprache ── */}
         <section>
           <SectionTitle>Sprache / Language</SectionTitle>
-          <div className="rounded-xl bg-surface-container p-5">
-            <p className="text-xs text-on-surface-variant mb-4">
+          <div className="rounded-xl bg-surface-container border border-outline-variant/10 p-5">
+            <p className="mono-text text-[11px] text-on-surface-variant/60 mb-4">
               Steuert die Anzeigesprache und die Antwortsprache des AI Coaches.
-              <br />
-              <span className="opacity-60">Controls the display language and the AI coach response language.</span>
+              <br />Controls the display language and the AI coach response language.
             </p>
             <div className="flex gap-3">
               {LANGUAGE_OPTIONS.map((opt) => (
@@ -553,25 +555,25 @@ export default function SettingsPage() {
                   type="button"
                   onClick={() => handleLocaleChange(opt.value)}
                   className={cn(
-                    "flex flex-1 items-center gap-3 rounded-xl border-2 px-4 py-3 text-left transition-all",
+                    "flex flex-1 items-center gap-3 rounded-xl px-4 py-3 text-left transition-all border",
                     selectedLocale === opt.value
-                      ? "border-primary bg-primary-container/15 text-on-surface"
-                      : "border-transparent bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest"
+                      ? "border-primary/30 bg-primary-container/10 text-on-surface"
+                      : "border-outline-variant/10 bg-surface-container-high text-on-surface-variant hover:border-outline-variant/25"
                   )}
                 >
                   <span className="text-2xl">{opt.flag}</span>
                   <div>
                     <p className="text-sm font-semibold">{opt.labelNative}</p>
-                    <p className="text-xs opacity-60">{opt.labelDe}</p>
+                    <p className="caption">{opt.labelDe}</p>
                   </div>
                   {selectedLocale === opt.value && (
-                    <span className="ml-auto text-primary text-sm font-bold">✓</span>
+                    <span className="ml-auto mono-text text-[11px] font-bold" style={{ color: "var(--color-primary-container)" }}>◉</span>
                   )}
                 </button>
               ))}
             </div>
             {storeLocale !== selectedLocale && !localeDirty && (
-              <p className="mt-3 text-xs text-on-surface-variant/50 font-mono">
+              <p className="caption mt-3">
                 Aktiv: {storeLocale.toUpperCase()} · Ausstehend: {selectedLocale.toUpperCase()}
               </p>
             )}
@@ -588,7 +590,7 @@ export default function SettingsPage() {
 
         {/* ── Coach-Stil ── */}
         <section>
-          <SectionTitle>Coach-Persoenlichkeit</SectionTitle>
+          <SectionTitle>Coach-Persönlichkeit</SectionTitle>
           <div className="flex flex-col gap-2">
             {PERSONALITY_DEFS.map((p) => (
               <button
@@ -596,19 +598,19 @@ export default function SettingsPage() {
                 type="button"
                 onClick={() => handlePersonalityChange(p.id)}
                 className={cn(
-                  "rounded-xl border-2 px-4 py-3 text-left transition-all",
+                  "rounded-xl border px-4 py-3 text-left transition-all",
                   selectedPersonality === p.id
-                    ? "border-primary bg-primary-container/15 text-on-surface"
-                    : "border-transparent bg-surface-container text-on-surface hover:bg-surface-container-high"
+                    ? "border-primary/30 bg-primary-container/10 text-on-surface"
+                    : "border-outline-variant/10 bg-surface-container text-on-surface hover:border-outline-variant/25"
                 )}
               >
                 <div className="flex items-center justify-between">
                   <p className="text-sm font-semibold">{p.label}</p>
                   {selectedPersonality === p.id && (
-                    <span className="text-primary text-sm font-bold">✓</span>
+                    <span className="mono-text text-[11px] font-bold" style={{ color: "var(--color-primary-container)" }}>◉ AKTIV</span>
                   )}
                 </div>
-                <p className="text-xs text-on-surface-variant mt-0.5">{p.tagline}</p>
+                <p className="caption mt-0.5">{p.tagline}</p>
               </button>
             ))}
           </div>
@@ -625,7 +627,7 @@ export default function SettingsPage() {
         {/* ── Anmeldedaten ── */}
         <section>
           <SectionTitle>Anmeldedaten</SectionTitle>
-          <div className="rounded-xl bg-surface-container p-5 flex flex-col gap-4">
+          <div className="rounded-xl bg-surface-container border border-outline-variant/10 p-5 flex flex-col gap-4">
             <Input
               id="displayName"
               label="Name"
@@ -652,8 +654,8 @@ export default function SettingsPage() {
 
         {/* ── Passwort ── */}
         <section>
-          <SectionTitle>Passwort aendern</SectionTitle>
-          <div className="rounded-xl bg-surface-container p-5 flex flex-col gap-4">
+          <SectionTitle>Passwort ändern</SectionTitle>
+          <div className="rounded-xl bg-surface-container border border-outline-variant/10 p-5 flex flex-col gap-4">
             <Input
               id="currentPassword"
               label="Aktuelles Passwort"
@@ -678,28 +680,27 @@ export default function SettingsPage() {
               onChange={(e) => { setPw((p) => ({ ...p, confirmPassword: e.target.value })); setPwSuccess(false); setPwError(null); }}
               autoComplete="new-password"
             />
-            {pwError && <p className="text-xs text-error">{pwError}</p>}
-            {pwSuccess && <p className="text-xs text-secondary">Passwort erfolgreich geaendert</p>}
+            {pwError && <p className="mono-text text-[11px] text-error">{pwError}</p>}
+            {pwSuccess && <p className="mono-text text-[11px] text-secondary">● Passwort erfolgreich geändert</p>}
             <div className="flex justify-end">
-              <Button
-                size="sm"
+              <button
                 onClick={savePassword}
-                isLoading={pwSaving}
-                disabled={!pw.currentPassword || !pw.newPassword || !pw.confirmPassword}
+                disabled={pwSaving || !pw.currentPassword || !pw.newPassword || !pw.confirmPassword}
+                className="btn-liquid rounded-lg px-4 py-2 text-sm font-bold text-on-primary disabled:opacity-40"
               >
-                Passwort aendern
-              </Button>
+                {pwSaving ? "…" : "Passwort ändern"}
+              </button>
             </div>
           </div>
         </section>
 
-        {/* ── Koerperdaten ── */}
+        {/* ── Körperdaten ── */}
         <section>
-          <SectionTitle>Koerperdaten</SectionTitle>
-          <div className="rounded-xl bg-surface-container p-5 flex flex-col gap-5">
+          <SectionTitle>Körperdaten</SectionTitle>
+          <div className="rounded-xl bg-surface-container border border-outline-variant/10 p-5 flex flex-col gap-5">
             {/* Birth date + computed age */}
             <div className="flex flex-col gap-1.5">
-              <label htmlFor="birthDate" className="text-xs font-medium uppercase tracking-widest text-on-surface-variant">
+              <label htmlFor="birthDate" className="caption">
                 Geburtsdatum
               </label>
               <div className="flex items-center gap-3">
@@ -750,7 +751,7 @@ export default function SettingsPage() {
 
             {/* Gender */}
             <div className="flex flex-col gap-1.5">
-              <span className="text-xs font-medium uppercase tracking-widest text-on-surface-variant">
+              <span className="caption">
                 Geschlecht
               </span>
               <div className="flex gap-2">
@@ -760,10 +761,10 @@ export default function SettingsPage() {
                     type="button"
                     onClick={() => handleBodyChange("gender", body.gender === g.value ? null : g.value)}
                     className={cn(
-                      "flex-1 rounded-md px-3 py-2 text-sm font-medium transition-all",
+                      "flex-1 rounded-lg border px-3 py-2 text-sm font-medium transition-all",
                       body.gender === g.value
-                        ? "bg-primary-container text-on-primary"
-                        : "bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest"
+                        ? "border-primary/30 bg-primary-container/10 text-on-surface"
+                        : "border-outline-variant/10 bg-surface-container-high text-on-surface-variant hover:border-outline-variant/25"
                     )}
                   >
                     {g.label}
@@ -774,7 +775,7 @@ export default function SettingsPage() {
 
             {/* Experience */}
             <div className="flex flex-col gap-1.5">
-              <span className="text-xs font-medium uppercase tracking-widest text-on-surface-variant">
+              <span className="caption">
                 Trainingserfahrung
               </span>
               <div className="grid grid-cols-2 gap-2">
@@ -784,14 +785,14 @@ export default function SettingsPage() {
                     type="button"
                     onClick={() => handleBodyChange("experienceLevel", body.experienceLevel === e.value ? null : e.value)}
                     className={cn(
-                      "rounded-md px-3 py-2.5 text-left transition-all",
+                      "rounded-lg border px-3 py-2.5 text-left transition-all",
                       body.experienceLevel === e.value
-                        ? "bg-primary-container text-on-primary"
-                        : "bg-surface-container-high text-on-surface hover:bg-surface-container-highest"
+                        ? "border-primary/30 bg-primary-container/10 text-on-surface"
+                        : "border-outline-variant/10 bg-surface-container-high text-on-surface hover:border-outline-variant/25"
                     )}
                   >
                     <p className="text-sm font-medium">{e.label}</p>
-                    <p className="text-xs opacity-60">{e.desc}</p>
+                    <p className="caption mt-0.5">{e.desc}</p>
                   </button>
                 ))}
               </div>
@@ -799,7 +800,7 @@ export default function SettingsPage() {
 
             {/* Goals */}
             <div className="flex flex-col gap-1.5">
-              <label htmlFor="goals" className="text-xs font-medium uppercase tracking-widest text-on-surface-variant">
+              <label htmlFor="goals" className="caption">
                 Trainingsziele
               </label>
               <textarea
@@ -814,7 +815,7 @@ export default function SettingsPage() {
 
             {/* Injuries */}
             <div className="flex flex-col gap-1.5">
-              <label htmlFor="injuries" className="text-xs font-medium uppercase tracking-widest text-on-surface-variant">
+              <label htmlFor="injuries" className="caption">
                 Verletzungen / Einschraenkungen
               </label>
               <textarea
@@ -840,7 +841,7 @@ export default function SettingsPage() {
         {/* ── Equipment ── */}
         <section>
           <SectionTitle>Verfügbares Equipment</SectionTitle>
-          <div className="rounded-xl bg-surface-container overflow-hidden">
+          <div className="rounded-xl bg-surface-container border border-outline-variant/10 overflow-hidden">
             {catalog.length === 0 ? (
               <p className="p-5 text-sm text-on-surface-variant">Kein Equipment im Katalog vorhanden.</p>
             ) : (() => {
@@ -902,10 +903,10 @@ export default function SettingsPage() {
                       <button
                         onClick={() => setEqCategoryFilter(null)}
                         className={cn(
-                          "shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium transition-all",
+                          "shrink-0 rounded-full border px-2.5 py-0.5 mono-text text-[10px] transition-all",
                           !eqCategoryFilter
-                            ? "bg-primary text-on-primary"
-                            : "bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest"
+                            ? "border-primary/30 bg-primary-container/15 text-on-surface"
+                            : "border-outline-variant/10 bg-surface-container-high text-on-surface-variant hover:border-outline-variant/25"
                         )}
                       >
                         Alle
@@ -915,10 +916,10 @@ export default function SettingsPage() {
                           key={cat}
                           onClick={() => setEqCategoryFilter(eqCategoryFilter === cat ? null : cat)}
                           className={cn(
-                            "shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium transition-all",
+                            "shrink-0 rounded-full border px-2.5 py-0.5 mono-text text-[10px] transition-all",
                             eqCategoryFilter === cat
-                              ? "bg-primary text-on-primary"
-                              : "bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest"
+                              ? "border-primary/30 bg-primary-container/15 text-on-surface"
+                              : "border-outline-variant/10 bg-surface-container-high text-on-surface-variant hover:border-outline-variant/25"
                           )}
                         >
                           {storeLocale === "en"
@@ -937,9 +938,7 @@ export default function SettingsPage() {
                       <div className="flex flex-col gap-4">
                         {groups.map(({ catKey, label, items }) => (
                           <div key={catKey ?? "__none"}>
-                            <p className="text-[10px] font-mono uppercase tracking-widest text-on-surface-variant/40 mb-1.5">
-                              {label}
-                            </p>
+                            <p className="caption mb-1.5">{label}</p>
                             <div className="flex flex-wrap gap-1.5">
                               {items.map((item) => {
                                 const selected = selectedEquipment.includes(item.id);
@@ -949,10 +948,10 @@ export default function SettingsPage() {
                                     type="button"
                                     onClick={() => toggleEquipment(item.id)}
                                     className={cn(
-                                      "rounded-full px-2.5 py-1 text-xs font-medium transition-all",
+                                      "rounded-full border px-2.5 py-1 text-xs font-medium transition-all",
                                       selected
-                                        ? "bg-primary text-on-primary"
-                                        : "bg-surface-container-high text-on-surface-variant hover:bg-surface-container-highest"
+                                        ? "border-primary/30 bg-primary-container/15 text-on-surface"
+                                        : "border-outline-variant/10 bg-surface-container-high text-on-surface-variant hover:border-outline-variant/25"
                                     )}
                                   >
                                     {selected && <span className="mr-1 text-[10px]">✓</span>}
