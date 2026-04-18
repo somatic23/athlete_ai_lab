@@ -61,7 +61,7 @@ const EXPERIENCE_OPTIONS = [
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
   return (
-    <h2 className="text-xs font-mono font-bold uppercase tracking-widest text-on-surface-variant mb-4">
+    <h2 className="caption mb-4">
       {children}
     </h2>
   );
@@ -473,7 +473,7 @@ export default function SettingsPage() {
       <div className="max-w-4xl mx-auto px-6 py-8 flex flex-col gap-10">
 
         <div>
-          <h1 className="font-headline text-2xl font-bold text-on-surface">Einstellungen</h1>
+          <h1 className="display-text text-2xl font-bold text-on-surface">Einstellungen</h1>
           <p className="text-sm text-on-surface-variant mt-1">Athleten-Profil und Konto verwalten</p>
         </div>
 

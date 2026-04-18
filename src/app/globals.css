@@ -74,6 +74,7 @@
   /* Typography */
   --font-headline: "Space Grotesk", sans-serif;
   --font-body: "Inter", sans-serif;
+  --font-mono: "JetBrains Mono", ui-monospace, monospace;
 
   /* Spacing scale (base 2) */
   --spacing-1: 0.125rem;
@@ -142,6 +143,7 @@
   /* Typography */
   --font-headline: var(--font-headline);
   --font-body: var(--font-body);
+  --font-mono: var(--font-mono);
 
   /* Border radius */
   --radius-sm: var(--radius-sm);
@@ -260,4 +262,141 @@ body {
   font-size: 0.75rem;
   font-weight: 600;
   padding: 0.125rem 0.5rem;
+}
+
+/* =============================================
+   DESIGN PROTOTYPE UTILITIES
+   ============================================= */
+
+/* Typographic role helpers */
+.caption {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--on-surface-variant);
+}
+
+.display-text {
+  font-family: var(--font-headline);
+  letter-spacing: -0.01em;
+}
+
+.mono-text {
+  font-family: var(--font-mono);
+  font-feature-settings: "ss01","cv01";
+}
+
+/* Primary glow (lime) */
+.glow-primary {
+  box-shadow: 0 0 64px -8px rgba(202,253,0,0.18), 0 0 20px -4px rgba(202,253,0,0.12);
+}
+
+/* Secondary glow (cyan) */
+.glow-secondary {
+  box-shadow: 0 0 48px -8px rgba(0,227,253,0.18);
+}
+
+/* Animated pulse dot */
+@keyframes pulse-dot {
+  0%,100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: .45; transform: scale(.85); }
+}
+.pulse-dot {
+  animation: pulse-dot 1.6s ease-in-out infinite;
+}
+
+/* Route-transition fade-up */
+@keyframes fade-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: none; }
+}
+.fade-up {
+  animation: fade-up 0.5s cubic-bezier(.22,1,.36,1) both;
+}
+
+/* Shimmer for active cards */
+@keyframes shine {
+  0%   { background-position: -100% 0; }
+  100% { background-position: 200% 0; }
+}
+.shine {
+  background: linear-gradient(
+    100deg,
+    rgba(255,255,255,0) 30%,
+    rgba(255,255,255,0.07) 50%,
+    rgba(255,255,255,0) 70%
+  );
+  background-size: 200% 100%;
+  animation: shine 3.5s linear infinite;
+}
+
+/* Segment / tab control */
+.seg {
+  display: inline-flex;
+  background: var(--surface-container-high);
+  padding: 3px;
+  border-radius: 10px;
+  gap: 2px;
+}
+.seg button {
+  padding: 5px 10px;
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: var(--on-surface-variant);
+  border-radius: 7px;
+  letter-spacing: .04em;
+  transition: all .15s;
+  cursor: pointer;
+}
+.seg button.on {
+  background: var(--surface-bright);
+  color: var(--on-surface);
+  box-shadow: inset 0 0 0 1px rgba(72,72,71,0.28);
+}
+.seg button:hover:not(.on) {
+  color: var(--on-surface);
+}
+
+/* Radial heat gradient for hero cards */
+.radial-heat {
+  background:
+    radial-gradient(120% 80% at 100% 0%, rgba(202,253,0,0.07), transparent 60%),
+    radial-gradient(100% 80% at 0% 100%, rgba(0,227,253,0.05), transparent 60%);
+}
+
+/* Gradient text (lime→cyan) */
+.grad-text {
+  background: linear-gradient(100deg, #fff 10%, #cafd00 55%, #00e3fd 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* Pill badge / chip */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: .04em;
+  padding: 2px 8px;
+  border-radius: 999px;
+}
+
+/* Nav left-edge tick indicator */
+.nav-tick {
+  position: absolute;
+  left: 0;
+  top: 50%;
+  width: 3px;
+  height: 0;
+  background: var(--primary-container);
+  transform: translateY(-50%);
+  transition: height .25s cubic-bezier(.22,1,.36,1);
+  border-radius: 2px;
+}
+.nav-tick-active {
+  height: 18px;
 }

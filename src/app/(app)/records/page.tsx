@@ -107,29 +107,6 @@ function fmtDateShort(iso: string) {
 
 // ── Sub-components ────────────────────────────────────────────────────────
 
-function Tab({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean;
-  onClick: () => void;
-  children: React.ReactNode;
-}) {
-  return (
-    <button
-      onClick={onClick}
-      className={cn(
-        "shrink-0 px-4 py-2 text-sm font-medium rounded-lg transition-all",
-        active
-          ? "bg-primary-container/20 text-primary"
-          : "text-on-surface-variant hover:text-on-surface"
-      )}
-    >
-      {children}
-    </button>
-  );
-}
 
 function PRCard({ pr }: { pr: PR }) {
   return (
@@ -426,11 +403,11 @@ export default function RecordsPage() {
         <h1 className="font-headline text-xl font-bold text-on-surface">Bestleistungen & Analytics</h1>
 
         {/* Tabs */}
-        <div className="flex gap-1 mt-3 overflow-x-auto no-scrollbar">
-          <Tab active={tab === "prs"} onClick={() => setTab("prs")}>PRs</Tab>
-          <Tab active={tab === "progression"} onClick={() => setTab("progression")}>Progression</Tab>
-          <Tab active={tab === "volume"} onClick={() => setTab("volume")}>Volumen</Tab>
-          <Tab active={tab === "ai"} onClick={() => setTab("ai")}>KI-Analyse</Tab>
+        <div className="seg mt-3 overflow-x-auto no-scrollbar" style={{ display: "inline-flex" }}>
+          <button className={cn(tab === "prs" && "on")} onClick={() => setTab("prs")}>PRs</button>
+          <button className={cn(tab === "progression" && "on")} onClick={() => setTab("progression")}>Progression</button>
+          <button className={cn(tab === "volume" && "on")} onClick={() => setTab("volume")}>Volumen</button>
+          <button className={cn(tab === "ai" && "on")} onClick={() => setTab("ai")}>KI-Analyse</button>
         </div>
       </div>
 
@@ -448,14 +425,64 @@ export default function RecordsPage() {
               </div>
             ) : (
               <>
-                {/* Top 3 highlight */}
-                {bests.length > 0 && (
+                {/* Hero PR card — top result */}
+                {bests.length > 0 && (() => {
+                  const top = bests[0];
+                  return (
+                    <div
+                      className="relative overflow-hidden rounded-2xl p-6"
+                      style={{
+                        background: "radial-gradient(120% 80% at 0% 0%, rgba(252,224,71,0.1), transparent 60%), var(--color-surface-container)",
+                        border: "1px solid rgba(252,224,71,0.22)",
+                      }}
+                    >
+                      <div className="shine pointer-events-none absolute inset-0" />
+                      <div className="relative flex items-start justify-between gap-4">
+                        <div className="flex flex-col gap-2 min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="caption">◆ {locale === "en" ? "Top PR" : "Bester PR"}</span>
+                            <span
+                              className="chip"
+                              style={{ background: "rgba(252,224,71,0.1)", color: "var(--color-tertiary-container)", border: "1px solid rgba(252,224,71,0.2)" }}
+                            >
+                              {fmtDate(top.achievedAt)}
+                            </span>
+                          </div>
+                          <h2 className="display-text text-xl font-bold text-on-surface truncate">{top.name}</h2>
+                          <p className="mono-text text-sm text-on-surface-variant/60">
+                            {top.weightKg} kg × {top.reps} {locale === "en" ? "reps" : "Wdh"}
+                          </p>
+                          <p className="mono-text text-xs text-on-surface-variant/40">
+                            {top.primaryMuscleGroup}
+                          </p>
+                        </div>
+                        <div className="shrink-0 text-right">
+                          <span
+                            className="display-text font-bold leading-none"
+                            style={{ fontSize: "clamp(40px,8vw,64px)", color: "var(--color-tertiary-container)" }}
+                          >
+                            {top.estimated1rm.toFixed(1)}
+                          </span>
+                          <p className="mono-text text-[10px] text-on-surface-variant/45 mt-0.5">kg est. 1RM</p>
+                          {top.deltaPct != null && top.deltaPct > 0 && (
+                            <p className="mono-text text-sm font-bold mt-1" style={{ color: "var(--color-tertiary-container)" }}>
+                              +{top.deltaPct.toFixed(1)}%
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })()}
+
+                {/* Top PRs grid */}
+                {bests.length > 1 && (
                   <div>
-                    <p className="text-xs font-mono uppercase tracking-widest text-on-surface-variant/60 mb-3">
-                      Top Bestleistungen
+                    <p className="caption mb-3">
+                      {locale === "en" ? "Top Records" : "Top Bestleistungen"}
                     </p>
                     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                      {bests.slice(0, 6).map((pr) => <PRCard key={pr.exerciseId} pr={pr} />)}
+                      {bests.slice(1, 7).map((pr) => <PRCard key={pr.exerciseId} pr={pr} />)}
                     </div>
                   </div>
                 )}
@@ -463,13 +490,20 @@ export default function RecordsPage() {
                 {/* Recent achievements */}
                 {recentPrs.length > 0 && (
                   <div>
-                    <p className="text-xs font-mono uppercase tracking-widest text-on-surface-variant/60 mb-3">
-                      Letzte 30 Tage
+                    <p className="caption mb-3">
+                      {locale === "en" ? "Last 30 Days" : "Letzte 30 Tage"}
                     </p>
-                    <div className="flex flex-col gap-2">
+                    <div className="flex flex-col gap-1.5">
                       {recentPrs.map((pr) => (
-                        <div key={pr.id} className="flex items-center gap-4 rounded-lg bg-surface-container-low px-4 py-3">
-                          <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-secondary/10 text-secondary text-xs font-bold">
+                        <div
+                          key={pr.id}
+                          className="flex items-center gap-4 rounded-xl px-4 py-3 transition-colors hover:bg-surface-container-high"
+                          style={{ background: "var(--color-surface-container-low)", border: "1px solid rgba(72,72,71,0.1)" }}
+                        >
+                          <div
+                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg mono-text text-[10px] font-bold text-secondary"
+                            style={{ background: "rgba(0,227,253,0.1)", border: "1px solid rgba(0,227,253,0.15)" }}
+                          >
                             PR
                           </div>
                           <div className="flex-1 min-w-0">
@@ -494,12 +528,16 @@ export default function RecordsPage() {
 
                 {/* All PRs table */}
                 <div>
-                  <p className="text-xs font-mono uppercase tracking-widest text-on-surface-variant/60 mb-3">
-                    Alle Übungen ({bests.length})
+                  <p className="caption mb-3">
+                    {locale === "en" ? `All Exercises (${bests.length})` : `Alle Übungen (${bests.length})`}
                   </p>
-                  <div className="flex flex-col gap-2">
+                  <div className="flex flex-col gap-1">
                     {bests.map((pr) => (
-                      <div key={pr.exerciseId} className="flex items-center gap-4 rounded-lg bg-surface-container-low px-4 py-3">
+                      <div
+                        key={pr.exerciseId}
+                        className="flex items-center gap-4 rounded-xl px-4 py-3 transition-colors hover:bg-surface-container"
+                        style={{ background: "var(--color-surface-container-low)" }}
+                      >
                         <div className="flex-1 min-w-0">
                           <p className="text-sm text-on-surface truncate">{pr.name}</p>
                         </div>

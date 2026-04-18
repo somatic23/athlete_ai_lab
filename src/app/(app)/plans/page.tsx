@@ -31,10 +31,17 @@ const STATUS_LABELS: Record<Plan["status"], string> = {
 };
 
 const STATUS_COLORS: Record<Plan["status"], string> = {
-  draft:    "text-on-surface-variant bg-surface-container-high",
-  active:   "text-secondary bg-secondary-container/30",
-  scheduled:"text-tertiary bg-tertiary-container/30",
-  archived: "text-on-surface-variant/50 bg-surface-container",
+  draft:    "text-on-surface-variant/60",
+  active:   "text-secondary",
+  scheduled:"text-tertiary",
+  archived: "text-on-surface-variant/35",
+};
+
+const STATUS_BG: Record<Plan["status"], React.CSSProperties> = {
+  draft:    { background: "rgba(72,72,71,0.15)", border: "1px solid rgba(72,72,71,0.2)" },
+  active:   { background: "rgba(0,227,253,0.1)", border: "1px solid rgba(0,227,253,0.2)" },
+  scheduled:{ background: "rgba(252,224,71,0.1)", border: "1px solid rgba(252,224,71,0.2)" },
+  archived: { background: "rgba(72,72,71,0.08)", border: "1px solid rgba(72,72,71,0.12)" },
 };
 
 function PlanCard({ plan, onDelete }: { plan: Plan; onDelete: (id: string) => void }) {
@@ -59,32 +66,61 @@ function PlanCard({ plan, onDelete }: { plan: Plan; onDelete: (id: string) => vo
   const totalExercises = plan.days.reduce((sum, d) => sum + d.exercises.length, 0);
 
   return (
-    <div className={cn(
-      "rounded-xl bg-surface-container p-5 flex flex-col gap-4 transition-opacity",
-      deleting && "opacity-50 pointer-events-none"
-    )}>
+    <div
+      className={cn(
+        "relative overflow-hidden rounded-xl p-5 flex flex-col gap-4 transition-opacity",
+        deleting && "opacity-50 pointer-events-none"
+      )}
+      style={{ background: "var(--color-surface-container)", border: "1px solid rgba(72,72,71,0.18)" }}
+    >
+      {/* Shine overlay for active plan */}
+      {plan.status === "active" && (
+        <div className="shine pointer-events-none absolute inset-0" />
+      )}
+
       {/* Header */}
-      <div className="flex items-start justify-between gap-3">
+      <div className="relative flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <div className="flex items-center gap-2 mb-1">
-            <span className={cn("text-xs font-mono font-bold uppercase px-2 py-0.5 rounded-full", STATUS_COLORS[plan.status])}>
-              {STATUS_LABELS[plan.status]}
+          <div className="flex items-center gap-2 mb-1.5">
+            <span
+              className={cn("chip font-bold", STATUS_COLORS[plan.status])}
+              style={STATUS_BG[plan.status]}
+            >
+              {plan.status === "active" ? "◉ " : ""}{STATUS_LABELS[plan.status]}
             </span>
             {plan.aiGenerated && (
-              <span className="text-xs font-mono text-on-surface-variant/50">AI</span>
+              <span
+                className="chip text-primary-container"
+                style={{ background: "rgba(202,253,0,0.08)", border: "1px solid rgba(202,253,0,0.15)" }}
+              >
+                ◈ AI
+              </span>
             )}
           </div>
-          <h3 className="font-headline font-bold text-on-surface truncate">{plan.title}</h3>
+          <h3 className="display-text font-bold text-on-surface truncate">{plan.title}</h3>
           {plan.description && (
-            <p className="text-sm text-on-surface-variant mt-0.5 line-clamp-2">{plan.description}</p>
+            <p className="text-sm text-on-surface-variant/70 mt-0.5 line-clamp-2">{plan.description}</p>
           )}
         </div>
       </div>
 
+      {/* Active plan indicator bar */}
+      {plan.status === "active" && (
+        <div className="h-[3px] w-full overflow-hidden rounded-full bg-surface-container-high">
+          <div
+            className="h-full w-3/4 rounded-full"
+            style={{
+              background: "linear-gradient(90deg, var(--color-primary-container), var(--color-secondary))",
+              boxShadow: "0 0 8px rgba(202,253,0,0.3)",
+            }}
+          />
+        </div>
+      )}
+
       {/* Stats */}
-      <div className="flex gap-4 text-xs font-mono text-on-surface-variant">
+      <div className="flex gap-4 mono-text text-[11px] text-on-surface-variant/60">
         <span>{plan.days.length} Tage</span>
-        <span>{totalExercises} Uebungen</span>
+        <span>{totalExercises} Übungen</span>
         <span>{new Date(plan.createdAt).toLocaleDateString("de-DE")}</span>
       </div>
 
@@ -94,7 +130,8 @@ function PlanCard({ plan, onDelete }: { plan: Plan; onDelete: (id: string) => vo
           {plan.days.map((day) => (
             <span
               key={day.id}
-              className="rounded-md bg-surface-container-high px-2 py-1 text-xs text-on-surface-variant truncate max-w-40"
+              className="rounded-md px-2 py-1 text-xs text-on-surface-variant/70 truncate max-w-40"
+              style={{ background: "var(--color-surface-container-high)", border: "1px solid rgba(72,72,71,0.12)" }}
             >
               {day.title}
             </span>
@@ -152,8 +189,11 @@ export default function PlansPage() {
               {plans.length === 0 ? "Noch kein Plan erstellt" : `${plans.length} ${plans.length === 1 ? "Plan" : "Plaene"}`}
             </p>
           </div>
-          <Link href="/plans/new">
-            <Button>+ Neuer Plan</Button>
+          <Link
+            href="/plans/new"
+            className="btn-liquid flex items-center gap-1.5 rounded-[9px] px-4 py-2 text-sm font-bold text-on-primary"
+          >
+            ⚡ Neuer Plan
           </Link>
         </div>
 
@@ -175,7 +215,7 @@ export default function PlansPage() {
           <div className="flex flex-col gap-6">
             {active.length > 0 && (
               <section>
-                <h2 className="text-xs font-mono uppercase tracking-wider text-on-surface-variant mb-3">Aktiv</h2>
+                <h2 className="caption mb-3">Aktiv</h2>
                 <div className="flex flex-col gap-3">
                   {active.map((p) => <PlanCard key={p.id} plan={p} onDelete={handleDelete} />)}
                 </div>
@@ -184,7 +224,7 @@ export default function PlansPage() {
             {rest.length > 0 && (
               <section>
                 {active.length > 0 && (
-                  <h2 className="text-xs font-mono uppercase tracking-wider text-on-surface-variant mb-3">Weitere</h2>
+                  <h2 className="caption mb-3">Weitere</h2>
                 )}
                 <div className="flex flex-col gap-3">
                   {rest.map((p) => <PlanCard key={p.id} plan={p} onDelete={handleDelete} />)}

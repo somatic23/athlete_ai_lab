@@ -9,7 +9,7 @@ import {
   aiAnalysisReports,
   workoutSessions,
 } from "@/db/schema";
-import { eq, and, gte, desc } from "drizzle-orm";
+import { eq, and, gte, lte, desc } from "drizzle-orm";
 import { parseI18n } from "@/lib/utils/i18n";
 
 function safeJsonArr(raw: string | null | undefined): string[] {
@@ -31,7 +31,19 @@ export async function GET() {
   const cutoff30 = new Date(Date.now() - 30 * 86_400_000).toISOString();
   const cutoff30Date = cutoff30.slice(0, 10);
 
-  const [userRow, activePlanRow, nextEventRow, loadRows, lastReportRow, recentSessionRows] =
+  // Current week Mon–Sun for 7-day schedule strip
+  const weekDay = now.getDay(); // 0=Sun
+  const daysToMon = weekDay === 0 ? -6 : 1 - weekDay;
+  const weekStart = new Date(now);
+  weekStart.setDate(now.getDate() + daysToMon);
+  weekStart.setHours(0, 0, 0, 0);
+  const weekEnd = new Date(weekStart);
+  weekEnd.setDate(weekStart.getDate() + 6);
+  weekEnd.setHours(23, 59, 59, 999);
+  const weekStartStr = weekStart.toISOString().slice(0, 10);
+  const weekEndStr = weekEnd.toISOString().slice(0, 10);
+
+  const [userRow, activePlanRow, nextEventRow, loadRows, lastReportRow, recentSessionRows, weekEventRows] =
     await Promise.all([
       // 1. User display name + locale
       db.query.users.findFirst({
@@ -92,6 +104,22 @@ export async function GET() {
       })
         .from(workoutSessions)
         .where(and(eq(workoutSessions.userId, userId), gte(workoutSessions.completedAt, cutoff30))),
+
+      // 7. This week's scheduled events (Mon–Sun) for 7-day strip
+      db.query.scheduledEvents.findMany({
+        where: and(
+          eq(scheduledEvents.userId, userId),
+          gte(scheduledEvents.scheduledDate, weekStartStr),
+          lte(scheduledEvents.scheduledDate, weekEndStr),
+        ),
+        columns: {
+          scheduledDate: true,
+          title: true,
+          eventType: true,
+          isCompleted: true,
+        },
+        orderBy: (e, { asc }) => [asc(e.scheduledDate)],
+      }),
     ]);
 
   const locale = (userRow?.preferredLocale ?? "de") as "de" | "en";
@@ -175,11 +203,14 @@ export async function GET() {
       const recovAt = row.fullyRecoveredAt ? new Date(row.fullyRecoveredAt).getTime() : 0;
       const recovered = recovAt <= nowTs;
       const hoursLeft = recovered ? 0 : Math.ceil((recovAt - nowTs) / 3_600_000);
+      // pct: 100 = fully recovered, 0 = freshly trained. Assumes 72h max window.
+      const pct = recovered ? 100 : Math.max(0, Math.round(100 - (hoursLeft / 72) * 100));
       return {
         muscle: row.muscleGroup,
         label: muscleLabels[row.muscleGroup] ?? row.muscleGroup,
         recovered,
         hoursLeft,
+        pct,
         fullyRecoveredAt: row.fullyRecoveredAt ?? null,
       };
     })
@@ -262,6 +293,47 @@ export async function GET() {
     return entry;
   });
 
+  // Training streak: consecutive non-rest days going backward from today
+  const trainingStreak = (() => {
+    let n = 0;
+    for (let i = trainingLoad.length - 1; i >= 0; i--) {
+      if (trainingLoad[i].volumeKg > 0) n++;
+      else break;
+    }
+    return n;
+  })();
+
+  // 7-day schedule strip
+  const weekSchedule = (() => {
+    const days: {
+      date: string;
+      dayShort: string;
+      dayNum: number;
+      isToday: boolean;
+      title: string | null;
+      isRest: boolean;
+      isCompleted: boolean;
+      rpe: number | null;
+    }[] = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(weekStart);
+      d.setDate(weekStart.getDate() + i);
+      const dateStr = d.toISOString().slice(0, 10);
+      const event = weekEventRows.find((e) => e.scheduledDate === dateStr);
+      days.push({
+        date: dateStr,
+        dayShort: ["Sun","Mon","Tue","Wed","Thu","Fri","Sat"][d.getDay()],
+        dayNum: d.getDate(),
+        isToday: dateStr === today,
+        title: event?.title ?? null,
+        isRest: event?.eventType === "rest",
+        isCompleted: event?.isCompleted ?? false,
+        rpe: null,
+      });
+    }
+    return days;
+  })();
+
   return NextResponse.json({
     user: { displayName: userRow?.displayName ?? "" },
     activePlan,
@@ -270,6 +342,8 @@ export async function GET() {
     lastReport,
     trainingLoad,
     muscleLoad,
+    trainingStreak,
+    weekSchedule,
     recentStats: {
       sessionsCount,
       totalVolumeKg: Math.round(totalVolumeKg),

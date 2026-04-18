@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth/config";
 import { db } from "@/db";
-import { users, userEquipment, equipment } from "@/db/schema";
-import { eq } from "drizzle-orm";
+import { users, userEquipment, equipment, workoutSessions } from "@/db/schema";
+import { eq, and, gte, desc } from "drizzle-orm";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 
@@ -55,9 +55,32 @@ export async function GET() {
     .innerJoin(equipment, eq(userEquipment.equipmentId, equipment.id))
     .where(eq(userEquipment.userId, session.user.id));
 
+  // Training streak: consecutive days with completed sessions going backward
+  const cutoff30 = new Date(Date.now() - 30 * 86_400_000).toISOString();
+  const recentSessions = await db
+    .select({ completedAt: workoutSessions.completedAt })
+    .from(workoutSessions)
+    .where(and(eq(workoutSessions.userId, session.user.id), gte(workoutSessions.completedAt, cutoff30)))
+    .orderBy(desc(workoutSessions.completedAt));
+
+  const trainingStreak = (() => {
+    const sessionDates = new Set(recentSessions.map((s) => s.completedAt?.slice(0, 10)).filter(Boolean));
+    let n = 0;
+    const now = new Date();
+    for (let i = 0; i < 30; i++) {
+      const d = new Date(now);
+      d.setDate(now.getDate() - i);
+      const dateStr = d.toISOString().slice(0, 10);
+      if (sessionDates.has(dateStr)) n++;
+      else if (i > 0) break; // allow today to be empty (in-progress day)
+    }
+    return n;
+  })();
+
   return NextResponse.json({
     ...user,
     equipmentIds: equipmentRows.map((r) => r.id),
+    trainingStreak,
   });
 }
 

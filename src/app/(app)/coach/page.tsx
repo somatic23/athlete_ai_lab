@@ -45,23 +45,39 @@ export default function CoachPage() {
       {/* Header */}
       <div className="shrink-0 border-b border-outline-variant/10 px-6 py-4">
         <div className="flex items-center gap-3">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary-container/20">
-            <span className="font-headline text-sm font-bold text-primary">A</span>
+          <div
+            className="relative flex h-9 w-9 shrink-0 items-center justify-center rounded-xl"
+            style={{
+              background: "linear-gradient(135deg, #cafd00 0%, #beee00 50%, #00e3fd 140%)",
+              boxShadow: "0 0 16px -2px rgba(202,253,0,0.4)",
+            }}
+          >
+            <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="#0e0e0e" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M4 14 10 4l6 10M7 11h6" />
+            </svg>
+            <span
+              className="pulse-dot absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-secondary"
+              style={{ border: "2px solid var(--color-surface)" }}
+            />
           </div>
           <div>
-            <h1 className="font-headline text-sm font-bold text-on-surface">Atlas</h1>
-            <p className="text-xs text-on-surface-variant">AI Strength Coach</p>
+            <h1 className="display-text text-sm font-bold text-on-surface">Atlas</h1>
+            <p className="mono-text text-[10px] text-on-surface-variant/50">AI STRENGTH COACH</p>
           </div>
-          <div className="ml-auto flex items-center gap-1.5">
-            <span
-              className={cn(
-                "h-2 w-2 rounded-full transition-colors",
-                isStreaming ? "bg-primary animate-pulse" : "bg-secondary"
-              )}
-            />
-            <span className="text-xs text-on-surface-variant">
-              {isStreaming ? "Antwortet..." : "Bereit"}
-            </span>
+          <div className="ml-auto flex items-center gap-2">
+            <div
+              className="flex items-center gap-2 rounded-full px-2.5 py-1 mono-text text-[10px]"
+              style={{
+                background: isStreaming ? "rgba(202,253,0,0.07)" : "rgba(0,227,253,0.07)",
+                border: `1px solid ${isStreaming ? "rgba(202,253,0,0.2)" : "rgba(0,227,253,0.2)"}`,
+                color: isStreaming ? "var(--color-primary-container)" : "var(--color-secondary)",
+              }}
+            >
+              <span
+                className={cn("h-1.5 w-1.5 rounded-full shrink-0", isStreaming ? "animate-pulse bg-primary-container" : "pulse-dot bg-secondary")}
+              />
+              {isStreaming ? "RESPONDING" : "ONLINE"}
+            </div>
           </div>
         </div>
       </div>
@@ -89,17 +105,26 @@ export default function CoachPage() {
                   )}
                 >
                   {msg.role === "assistant" && (
-                    <div className="mr-2 mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary-container/20">
-                      <span className="font-headline text-xs font-bold text-primary">A</span>
+                    <div
+                      className="mr-2 mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg"
+                      style={{
+                        background: "linear-gradient(135deg, #cafd00 0%, #00e3fd 140%)",
+                        boxShadow: "0 0 10px -2px rgba(202,253,0,0.3)",
+                      }}
+                    >
+                      <svg width="11" height="11" viewBox="0 0 20 20" fill="none" stroke="#0e0e0e" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M4 14 10 4l6 10M7 11h6" />
+                      </svg>
                     </div>
                   )}
                   <div
                     className={cn(
-                      "max-w-[80%] rounded-xl px-4 py-3 text-sm",
+                      "max-w-[80%] rounded-2xl px-4 py-3 text-sm",
                       msg.role === "user"
-                        ? "bg-primary-container text-on-primary rounded-br-sm"
-                        : "bg-surface-container text-on-surface rounded-bl-sm"
+                        ? "bg-primary-container text-on-primary rounded-br-[4px]"
+                        : "bg-surface-container text-on-surface rounded-bl-[4px]"
                     )}
+                    style={msg.role === "assistant" ? { border: "1px solid rgba(72,72,71,0.18)" } : undefined}
                   >
                     {msg.role === "assistant" ? (
                       <MarkdownText text={textContent} />
@@ -107,11 +132,19 @@ export default function CoachPage() {
                       <p className="whitespace-pre-wrap">{textContent}</p>
                     )}
 
-                    {/* Streaming cursor */}
+                    {/* 3-dot typing indicator */}
                     {msg.role === "assistant" &&
                       isStreaming &&
                       msg === messages[messages.length - 1] && (
-                        <span className="ml-0.5 inline-block h-4 w-0.5 animate-pulse bg-primary align-middle" />
+                        <span className="ml-1.5 inline-flex items-end gap-0.5 pb-0.5">
+                          {[0, 200, 400].map((delay, i) => (
+                            <span
+                              key={i}
+                              className="inline-block h-1 w-1 rounded-full bg-primary-container/60"
+                              style={{ animation: "pulse-dot 1.4s ease-in-out infinite", animationDelay: `${delay}ms` }}
+                            />
+                          ))}
+                        </span>
                       )}
                   </div>
                 </div>
@@ -143,15 +176,15 @@ export default function CoachPage() {
             className={cn(
               "flex h-10 w-10 shrink-0 items-center justify-center rounded-xl transition-all",
               input.trim() && !isStreaming
-                ? "bg-primary text-on-primary hover:opacity-90"
-                : "bg-surface-container text-on-surface-variant opacity-50 cursor-not-allowed"
+                ? "btn-liquid text-on-primary hover:opacity-90"
+                : "bg-surface-container text-on-surface-variant/40 cursor-not-allowed"
             )}
           >
             <SendIcon />
           </button>
         </form>
-        <p className="mt-2 text-center text-xs text-on-surface-variant/50">
-          Enter zum Senden · Shift+Enter für neue Zeile
+        <p className="mt-2 text-center mono-text text-[10px] text-on-surface-variant/30">
+          ⏎ {" "}senden · Shift+⏎ neue Zeile · nicht als medizinische Beratung verwenden
         </p>
       </div>
     </div>
@@ -170,21 +203,30 @@ function EmptyState({ onPrompt }: { onPrompt: (text: string) => void }) {
 
   return (
     <div className="mx-auto flex max-w-2xl flex-col items-center justify-center py-16 text-center">
-      <div className="mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary-container/20">
-        <span className="font-headline text-2xl font-bold text-primary">A</span>
+      <div
+        className="relative mb-6 flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl"
+        style={{
+          background: "linear-gradient(135deg, #cafd00 0%, #beee00 50%, #00e3fd 140%)",
+          boxShadow: "0 0 32px -4px rgba(202,253,0,0.5)",
+        }}
+      >
+        <svg width="28" height="28" viewBox="0 0 20 20" fill="none" stroke="#0e0e0e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M4 14 10 4l6 10M7 11h6" />
+        </svg>
       </div>
-      <h2 className="font-headline text-xl font-bold text-on-surface">
+      <h2 className="display-text text-xl font-bold text-on-surface">
         Bereit zu trainieren?
       </h2>
-      <p className="mt-2 text-sm text-on-surface-variant">
-        Stell Atlas eine Frage oder starte direkt mit einem der Vorschlaege.
+      <p className="mt-2 text-sm text-on-surface-variant/70">
+        Stell Atlas eine Frage oder starte direkt mit einem der Vorschläge.
       </p>
       <div className="mt-8 grid grid-cols-1 gap-2 sm:grid-cols-2">
         {STARTERS.map((s) => (
           <button
             key={s}
             onClick={() => onPrompt(s)}
-            className="rounded-xl bg-surface-container px-4 py-3 text-left text-sm text-on-surface-variant transition-all hover:bg-surface-container-high hover:text-on-surface"
+            className="rounded-xl px-4 py-3 text-left text-sm text-on-surface-variant/80 transition-all hover:text-on-surface"
+            style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(72,72,71,0.2)" }}
           >
             {s}
           </button>

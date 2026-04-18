@@ -79,26 +79,24 @@ function StartWorkoutModal({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-surface/60 backdrop-blur" onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-surface/70 backdrop-blur" onClick={onClose}>
       <div
-        className="w-full max-w-sm rounded-2xl bg-surface-container-high p-6 flex flex-col gap-5 shadow-2xl"
+        className="w-full max-w-sm rounded-2xl p-6 flex flex-col gap-5 shadow-2xl"
+        style={{ background: "var(--color-surface-container-high)", border: "1px solid rgba(72,72,71,0.25)" }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">
-          <h2 className="font-headline font-bold text-on-surface">Training starten</h2>
-          <button onClick={onClose} className="text-on-surface-variant/50 hover:text-on-surface transition-colors">✕</button>
+          <h2 className="display-text font-bold text-on-surface">Training starten</h2>
+          <button onClick={onClose} className="mono-text text-[13px] text-on-surface-variant/40 hover:text-on-surface transition-colors">✕</button>
         </div>
 
         {/* Mode tabs */}
-        <div className="flex gap-1 rounded-lg bg-surface-container p-1">
+        <div className="seg w-full">
           {(["plan", "free"] as const).map((m) => (
             <button
               key={m}
               onClick={() => setMode(m)}
-              className={cn(
-                "flex-1 rounded py-1.5 text-sm font-medium transition-all",
-                mode === m ? "bg-surface-container-high text-on-surface" : "text-on-surface-variant/60"
-              )}
+              className={cn("flex-1", mode === m && "on")}
             >
               {m === "plan" ? "Aus Plan" : "Freies Training"}
             </button>
@@ -113,21 +111,23 @@ function StartWorkoutModal({
               </p>
             ) : (
               <>
-                <p className="text-xs text-on-surface-variant/60 font-mono">{activePlan.title}</p>
+                <p className="caption">{activePlan.title}</p>
                 {activePlan.days.map((day) => (
                   <button
                     key={day.id}
                     onClick={() => setSelectedDayId(day.id)}
-                    className={cn(
-                      "w-full rounded-xl p-3 text-left border transition-all",
+                    className="w-full rounded-xl p-3 text-left transition-all"
+                    style={
                       selectedDayId === day.id
-                        ? "bg-primary-container/20 border-primary/30 text-primary"
-                        : "bg-surface-container border-transparent hover:border-outline-variant/20 text-on-surface"
-                    )}
+                        ? { background: "rgba(202,253,0,0.08)", border: "1px solid rgba(202,253,0,0.25)" }
+                        : { background: "var(--color-surface-container)", border: "1px solid rgba(72,72,71,0.12)" }
+                    }
                   >
-                    <p className="text-sm font-medium">{day.title}</p>
+                    <p className={cn("text-sm font-medium", selectedDayId === day.id ? "text-primary-container" : "text-on-surface")}>
+                      {day.title}
+                    </p>
                     {day.focus && (
-                      <p className="text-xs text-on-surface-variant/60 mt-0.5">{day.focus}</p>
+                      <p className="mono-text text-[10px] text-on-surface-variant/50 mt-0.5">{day.focus}</p>
                     )}
                   </button>
                 ))}
@@ -151,9 +151,9 @@ function StartWorkoutModal({
         <button
           onClick={handleStart}
           disabled={mode === "plan" && !selectedDayId}
-          className="w-full rounded-xl bg-primary text-on-primary py-3 font-bold text-sm hover:opacity-90 transition-all disabled:opacity-40"
+          className="btn-liquid w-full rounded-xl py-3 font-bold text-sm text-on-primary hover:opacity-90 transition-all disabled:opacity-40"
         >
-          Training starten
+          ⚡ Training starten
         </button>
       </div>
     </div>
@@ -178,33 +178,43 @@ function SessionCard({
   })();
 
   return (
-    <div className="relative rounded-xl bg-surface-container-low overflow-hidden">
+    <div
+      className="relative overflow-hidden rounded-xl transition-colors"
+      style={{ background: "var(--color-surface-container-low)", border: "1px solid rgba(72,72,71,0.12)" }}
+    >
       {/* Main card — clickable */}
       <button
         onClick={onClick}
-        className="w-full p-4 flex flex-col gap-2 text-left hover:bg-surface-container transition-colors"
+        className="w-full p-4 flex flex-col gap-2 text-left hover:bg-surface-container/50 transition-colors"
       >
         <div className="flex items-start justify-between gap-2">
           <div className="min-w-0">
-            <p className="font-medium text-on-surface truncate">{session.title}</p>
-            <p className="text-xs text-on-surface-variant/60 font-mono mt-0.5">{fmtDate(session.startedAt)}</p>
+            <p className="text-sm font-semibold text-on-surface truncate">{session.title}</p>
+            <p className="mono-text text-[10px] text-on-surface-variant/50 mt-0.5">{fmtDate(session.startedAt)}</p>
           </div>
-          <div className="flex items-center gap-3 shrink-0">
+          <div className="flex items-center gap-2.5 shrink-0">
             {session.satisfactionRating && (
-              <span className="text-base">
+              <span className="text-sm leading-none">
                 {["😞", "😕", "😐", "😊", "🔥"][session.satisfactionRating - 1]}
               </span>
             )}
             {session.perceivedLoad && (
-              <span className={cn("text-xs font-mono", LOAD_COLOR[session.perceivedLoad])}>
+              <span
+                className="chip"
+                style={{
+                  background: "rgba(255,255,255,0.04)",
+                  border: "1px solid rgba(72,72,71,0.15)",
+                  color: `var(--color-${session.perceivedLoad === "light" ? "secondary" : session.perceivedLoad === "very_heavy" || session.perceivedLoad === "maximal" ? "error" : "tertiary-container"})`,
+                }}
+              >
                 {LOAD_LABEL[session.perceivedLoad]}
               </span>
             )}
-            <span className="text-on-surface-variant/30 text-sm">→</span>
+            <span className="text-on-surface-variant/25 text-xs">→</span>
           </div>
         </div>
 
-        <div className="flex gap-4 text-xs font-mono text-on-surface-variant/70">
+        <div className="flex gap-4 mono-text text-[11px] text-on-surface-variant/60">
           <span>{fmtDuration(session.durationSeconds)}</span>
           {session.totalVolumeKg != null && <span>{session.totalVolumeKg.toFixed(0)} kg</span>}
           {session.totalSets != null && <span>{session.totalSets} Sätze</span>}
@@ -213,7 +223,11 @@ function SessionCard({
         {muscles.length > 0 && (
           <div className="flex flex-wrap gap-1">
             {muscles.map((mg) => (
-              <span key={mg} className="rounded bg-surface-container px-1.5 py-0.5 text-xs text-on-surface-variant/60">
+              <span
+                key={mg}
+                className="rounded-md px-1.5 py-0.5 text-[10px] text-on-surface-variant/55 mono-text"
+                style={{ background: "rgba(255,255,255,0.04)", border: "1px solid rgba(72,72,71,0.12)" }}
+              >
                 {MUSCLE_LABELS[mg] ?? mg}
               </span>
             ))}
@@ -221,7 +235,7 @@ function SessionCard({
         )}
 
         {!session.completedAt && (
-          <span className="text-xs text-amber-400 font-mono">● Nicht abgeschlossen</span>
+          <span className="mono-text text-[10px] text-amber-400/80">● Nicht abgeschlossen</span>
         )}
       </button>
 
@@ -311,28 +325,35 @@ export default function WorkoutHistoryPage() {
     <div className="flex h-full flex-col overflow-hidden">
       {/* Header */}
       <div className="shrink-0 flex items-center justify-between border-b border-outline-variant/10 px-5 py-4">
-        <h1 className="font-headline text-xl font-bold text-on-surface">Trainingshistorie</h1>
+        <h1 className="display-text text-xl font-bold text-on-surface">Trainingshistorie</h1>
         <button
           onClick={() => setShowModal(true)}
           disabled={starting}
-          className="rounded-xl bg-primary text-on-primary px-4 py-2 text-sm font-bold hover:opacity-90 transition-all disabled:opacity-50"
+          className="btn-liquid rounded-[9px] px-4 py-2 text-sm font-bold text-on-primary hover:opacity-90 transition-all disabled:opacity-50"
         >
-          {starting ? "Starten…" : "+ Training"}
+          {starting ? "Starten…" : "⚡ Training"}
         </button>
       </div>
 
       {/* Active workout banner */}
       {activeWorkout && (
-        <div className="shrink-0 mx-4 mt-3 rounded-xl bg-primary/10 border border-primary/20 p-3 flex items-center justify-between gap-3">
-          <div>
-            <p className="text-xs font-mono text-primary/70 uppercase">Aktives Training</p>
-            <p className="text-sm font-medium text-on-surface">{activeWorkout.title}</p>
+        <div
+          className="relative mx-4 mt-3 shrink-0 overflow-hidden rounded-xl p-3 flex items-center justify-between gap-3"
+          style={{
+            background: "rgba(202,253,0,0.06)",
+            border: "1px solid rgba(202,253,0,0.2)",
+          }}
+        >
+          <div className="shine pointer-events-none absolute inset-0" />
+          <div className="relative">
+            <p className="caption text-primary-container/70">Aktives Training</p>
+            <p className="text-sm font-semibold text-on-surface mt-0.5">{activeWorkout.title}</p>
           </div>
           <button
             onClick={() => router.push(`/workout/${activeWorkout.sessionId}`)}
-            className="rounded-lg bg-primary/15 text-primary px-3 py-1.5 text-sm font-medium hover:bg-primary/25 transition-all shrink-0"
+            className="btn-liquid relative shrink-0 rounded-lg px-3 py-1.5 text-sm font-bold text-on-primary hover:opacity-90 transition-all"
           >
-            Fortsetzen →
+            Fortsetzen ⚡
           </button>
         </div>
       )}
