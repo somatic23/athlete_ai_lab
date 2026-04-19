@@ -2,6 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { getPersonality } from "@/lib/coach-personalities";
 import Link from "next/link";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport, isTextUIPart, isToolUIPart, getToolName } from "ai";
@@ -208,6 +209,14 @@ export default function NewPlanPage() {
   const [stage, setStage] = useState<Stage>("idle");
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
+  const [coachName, setCoachName] = useState("Atlas");
+
+  useEffect(() => {
+    fetch("/api/profile")
+      .then((r) => r.json())
+      .then((p) => { if (p.coachPersonality) setCoachName(getPersonality(p.coachPersonality).label); })
+      .catch(() => {});
+  }, []);
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [input, setInput] = useState("");
@@ -311,10 +320,10 @@ export default function NewPlanPage() {
           <span className="text-on-surface-variant/30">|</span>
           <div className="flex items-center gap-2">
             <div className="flex h-7 w-7 items-center justify-center rounded-md bg-primary-container/20">
-              <span className="font-headline text-xs font-bold text-primary">A</span>
+              <span className="font-headline text-xs font-bold text-primary">{coachName[0]}</span>
             </div>
             <div>
-              <span className="font-headline text-sm font-bold text-on-surface">Atlas</span>
+              <span className="font-headline text-sm font-bold text-on-surface">{coachName}</span>
               <span className="ml-2 text-xs text-on-surface-variant">Planersteller</span>
             </div>
           </div>
@@ -350,11 +359,11 @@ export default function NewPlanPage() {
                   className="group rounded-xl bg-surface-container p-6 text-left transition-all hover:bg-primary-container/10 hover:ring-1 hover:ring-primary/20"
                 >
                   <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary-container/20 transition-colors group-hover:bg-primary-container/30">
-                    <span className="font-headline text-xl font-bold text-primary">A</span>
+                    <span className="font-headline text-xl font-bold text-primary">{coachName[0]}</span>
                   </div>
                   <h3 className="font-headline font-bold text-on-surface">Mit AI erstellen</h3>
                   <p className="mt-1.5 text-xs text-on-surface-variant">
-                    Atlas stellt dir Fragen und schlägt einen personalisierten Plan vor.
+                    {coachName} stellt dir Fragen und schlägt einen personalisierten Plan vor.
                   </p>
                 </button>
 
@@ -395,7 +404,7 @@ export default function NewPlanPage() {
                     <div className={cn("flex", msg.role === "user" ? "justify-end" : "justify-start")}>
                       {msg.role === "assistant" && (
                         <div className="mr-2 mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-primary-container/20">
-                          <span className="font-headline text-xs font-bold text-primary">A</span>
+                          <span className="font-headline text-xs font-bold text-primary">{coachName[0]}</span>
                         </div>
                       )}
                       <div className={cn(
@@ -486,7 +495,7 @@ export default function NewPlanPage() {
                 placeholder={
                   lastProposalKey
                     ? "Anpassungswünsche? z.B. 'Mehr Volumen für Rücken'..."
-                    : "Antworte Atlas..."
+                    : `Antworte ${coachName}...`
                 }
                 rows={1}
                 disabled={saving}

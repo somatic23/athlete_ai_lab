@@ -4,13 +4,22 @@ import { useState, useRef, useEffect } from "react";
 import { useChat } from "@ai-sdk/react";
 import { isTextUIPart } from "ai";
 import { cn } from "@/lib/utils/cn";
+import { getPersonality } from "@/lib/coach-personalities";
 
 export default function CoachPage() {
   const { messages, sendMessage, status } = useChat();
   const [input, setInput] = useState("");
+  const [coachName, setCoachName] = useState("Atlas");
   const bottomRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const isStreaming = status === "streaming" || status === "submitted";
+
+  useEffect(() => {
+    fetch("/api/profile")
+      .then((r) => r.json())
+      .then((p) => { if (p.coachPersonality) setCoachName(getPersonality(p.coachPersonality).label); })
+      .catch(() => {});
+  }, []);
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -52,16 +61,14 @@ export default function CoachPage() {
               boxShadow: "0 0 16px -2px rgba(202,253,0,0.4)",
             }}
           >
-            <svg width="15" height="15" viewBox="0 0 20 20" fill="none" stroke="#0e0e0e" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M4 14 10 4l6 10M7 11h6" />
-            </svg>
+            <span className="font-headline text-sm font-bold text-[#0e0e0e] leading-none">{coachName[0]}</span>
             <span
               className="pulse-dot absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-secondary"
               style={{ border: "2px solid var(--color-surface)" }}
             />
           </div>
           <div>
-            <h1 className="display-text text-sm font-bold text-on-surface">Atlas</h1>
+            <h1 className="display-text text-sm font-bold text-on-surface">{coachName}</h1>
             <p className="mono-text text-[10px] text-on-surface-variant/50">AI STRENGTH COACH</p>
           </div>
           <div className="ml-auto flex items-center gap-2">
@@ -85,7 +92,7 @@ export default function CoachPage() {
       {/* Messages */}
       <div className="hide-scrollbar flex-1 overflow-y-auto px-4 py-6">
         {messages.length === 0 ? (
-          <EmptyState onPrompt={(text) => { sendMessage({ text }); }} />
+          <EmptyState coachName={coachName} onPrompt={(text) => { sendMessage({ text }); }} />
         ) : (
           <div className="mx-auto flex max-w-2xl flex-col gap-4">
             {messages.map((msg) => {
@@ -112,9 +119,7 @@ export default function CoachPage() {
                         boxShadow: "0 0 10px -2px rgba(202,253,0,0.3)",
                       }}
                     >
-                      <svg width="11" height="11" viewBox="0 0 20 20" fill="none" stroke="#0e0e0e" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                        <path d="M4 14 10 4l6 10M7 11h6" />
-                      </svg>
+                      <span className="font-headline text-xs font-bold text-[#0e0e0e] leading-none">{coachName[0]}</span>
                     </div>
                   )}
                   <div
@@ -166,7 +171,7 @@ export default function CoachPage() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Frag Atlas..."
+            placeholder={`Frag ${coachName}...`}
             rows={1}
             className="hide-scrollbar flex-1 resize-none rounded-xl bg-surface-container px-4 py-3 text-sm text-on-surface placeholder:text-on-surface-variant/50 outline-none transition-all focus:bg-surface-container-high"
           />
@@ -193,7 +198,7 @@ export default function CoachPage() {
 
 // ── Sub-components ─────────────────────────────────────────────────
 
-function EmptyState({ onPrompt }: { onPrompt: (text: string) => void }) {
+function EmptyState({ coachName, onPrompt }: { coachName: string; onPrompt: (text: string) => void }) {
   const STARTERS = [
     "Erstelle mir einen Trainingsplan für Muskelaufbau",
     "Wie optimiere ich meine Kniebeuge-Technik?",
@@ -210,15 +215,13 @@ function EmptyState({ onPrompt }: { onPrompt: (text: string) => void }) {
           boxShadow: "0 0 32px -4px rgba(202,253,0,0.5)",
         }}
       >
-        <svg width="28" height="28" viewBox="0 0 20 20" fill="none" stroke="#0e0e0e" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M4 14 10 4l6 10M7 11h6" />
-        </svg>
+        <span className="font-headline text-3xl font-bold text-[#0e0e0e] leading-none">{coachName[0]}</span>
       </div>
       <h2 className="display-text text-xl font-bold text-on-surface">
         Bereit zu trainieren?
       </h2>
       <p className="mt-2 text-sm text-on-surface-variant/70">
-        Stell Atlas eine Frage oder starte direkt mit einem der Vorschläge.
+        Stell {coachName} eine Frage oder starte direkt mit einem der Vorschläge.
       </p>
       <div className="mt-8 grid grid-cols-1 gap-2 sm:grid-cols-2">
         {STARTERS.map((s) => (

@@ -8,6 +8,7 @@ import { signOut } from "next-auth/react";
 import { cn } from "@/lib/utils/cn";
 import { useLocaleStore } from "@/stores/locale-store";
 import { ErrorBoundary } from "@/components/ui/error-boundary";
+import { getPersonality } from "@/lib/coach-personalities";
 
 // ── Nav items ─────────────────────────────────────────────────────────
 
@@ -101,8 +102,7 @@ function StreakWidget({ streak }: { streak: number }) {
 
 // ── TopBar (desktop only) ─────────────────────────────────────────────
 
-function TopBar({ pathname }: { pathname: string }) {
-  const [crumbs] = useState(() => getCrumbs(pathname));
+function TopBar({ pathname, coachName }: { pathname: string; coachName: string }) {
   const [dateTime, setDateTime] = useState("");
 
   useEffect(() => {
@@ -119,7 +119,8 @@ function TopBar({ pathname }: { pathname: string }) {
     return () => clearInterval(id);
   }, []);
 
-  const [section, page] = getCrumbs(pathname);
+  const crumbs = getCrumbs(pathname);
+  const [section, page] = pathname === "/coach" ? [crumbs[0], coachName] : crumbs;
 
   return (
     <div
@@ -169,12 +170,14 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
     avatarUrl: string | null;
     trainingStreak: number;
   } | null>(null);
+  const [coachName, setCoachName] = useState("Atlas");
 
   useEffect(() => {
     fetch("/api/profile")
       .then((r) => r.json())
       .then((p) => {
         if (p.preferredLocale) setLocale(p.preferredLocale);
+        if (p.coachPersonality) setCoachName(getPersonality(p.coachPersonality).label);
         setUserMeta({
           displayName: p.displayName ?? "",
           avatarUrl: p.avatarUrl ?? null,
@@ -315,7 +318,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
         {/* Mobile top bar spacer */}
         <div className="h-[52px] shrink-0 lg:hidden" />
         {/* Desktop TopBar */}
-        <TopBar pathname={pathname} />
+        <TopBar pathname={pathname} coachName={coachName} />
         <div className="min-h-0 flex-1 overflow-hidden">
           <ErrorBoundary>{children}</ErrorBoundary>
         </div>
