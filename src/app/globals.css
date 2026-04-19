@@ -306,6 +306,12 @@ body {
   animation: pulse-dot 1.6s ease-in-out infinite;
 }
 
+/* Chat typing bounce */
+@keyframes typing-bounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.5; }
+  30%            { transform: translateY(-5px); opacity: 1; }
+}
+
 /* Route-transition fade-up */
 @keyframes fade-up {
   from { opacity: 0; transform: translateY(8px); }

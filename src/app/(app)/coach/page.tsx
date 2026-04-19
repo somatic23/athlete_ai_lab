@@ -155,6 +155,33 @@ export default function CoachPage() {
                 </div>
               );
             })}
+            {/* Typing bubble — visible while waiting for first token */}
+            {isStreaming && messages[messages.length - 1]?.role === "user" && (
+              <div className="flex justify-start">
+                <div
+                  className="mr-2 mt-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-lg"
+                  style={{
+                    background: "linear-gradient(135deg, #cafd00 0%, #00e3fd 140%)",
+                    boxShadow: "0 0 10px -2px rgba(202,253,0,0.3)",
+                  }}
+                >
+                  <span className="font-headline text-xs font-bold text-[#0e0e0e] leading-none">{coachName[0]}</span>
+                </div>
+                <div
+                  className="flex items-center gap-1 rounded-2xl rounded-bl-[4px] bg-surface-container px-4 py-3"
+                  style={{ border: "1px solid rgba(72,72,71,0.18)" }}
+                >
+                  {[0, 160, 320].map((delay, i) => (
+                    <span
+                      key={i}
+                      className="inline-block h-2 w-2 rounded-full bg-primary-container/50"
+                      style={{ animation: "typing-bounce 1.2s ease-in-out infinite", animationDelay: `${delay}ms` }}
+                    />
+                  ))}
+                </div>
+              </div>
+            )}
+
             <div ref={bottomRef} />
           </div>
         )}
