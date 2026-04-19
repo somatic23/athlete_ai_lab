@@ -103,12 +103,7 @@ function StreakWidget({ streak }: { streak: number }) {
 
 function TopBar({ pathname }: { pathname: string }) {
   const [crumbs] = useState(() => getCrumbs(pathname));
-  const [dateTime, setDateTime] = useState(() => {
-    const now = new Date();
-    return now.toLocaleDateString("en-GB", { weekday: "long", day: "numeric", month: "long" })
-      + " · "
-      + now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
-  });
+  const [dateTime, setDateTime] = useState("");
 
   useEffect(() => {
     const tick = () => {
@@ -119,6 +114,7 @@ function TopBar({ pathname }: { pathname: string }) {
         + now.toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" })
       );
     };
+    tick();
     const id = setInterval(tick, 60_000);
     return () => clearInterval(id);
   }, []);
