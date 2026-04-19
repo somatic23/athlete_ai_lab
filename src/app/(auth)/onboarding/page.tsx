@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -55,6 +56,7 @@ const GENDER_OPTIONS = [
 
 export default function OnboardingPage() {
   const { update } = useSession();
+  const router = useRouter();
   const [step, setStep] = useState(1);
   const [done, setDone] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -157,7 +159,7 @@ export default function OnboardingPage() {
               </div>
             )}
             <button
-              onClick={() => signOut({ redirectTo: "/login" })}
+              onClick={() => signOut({ redirect: false }).then(() => router.push("/login"))}
               className="mt-2 w-full rounded-md bg-primary-container px-5 py-3 font-headline text-sm font-medium uppercase tracking-wide text-on-primary transition-all hover:opacity-90 active:scale-95"
             >
               Los geht&apos;s →

@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
@@ -162,6 +162,7 @@ function TopBar({ pathname }: { pathname: string }) {
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
+  const router = useRouter();
   const { locale, setLocale } = useLocaleStore();
   const [userMeta, setUserMeta] = useState<{
     displayName: string;
@@ -279,7 +280,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
             </svg>
           </Link>
           <button
-            onClick={() => signOut({ redirectTo: "/login" })}
+            onClick={() => signOut({ redirect: false }).then(() => router.push("/login"))}
             className="mt-1 w-full rounded-lg px-2 py-1.5 text-left text-xs text-on-surface-variant/50 transition-all hover:bg-error/5 hover:text-error"
           >
             {locale === "en" ? "Sign out" : "Abmelden"}
