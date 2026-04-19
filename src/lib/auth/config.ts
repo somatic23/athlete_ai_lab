@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { authConfig } from "./edge-config";
+import { logger } from "@/lib/utils/logger";
 
 const loginSchema = z.object({
   email: z.string().email(),
@@ -14,6 +15,15 @@ const loginSchema = z.object({
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
   ...authConfig,
+  events: {
+    async signOut(message) {
+      const token = "token" in message ? message.token : undefined;
+      await logger.info("auth.logout", {
+        userId: token?.id as string | undefined,
+        metadata: { email: token?.email, displayName: token?.name },
+      });
+    },
+  },
   callbacks: {
     ...authConfig.callbacks,
     async jwt({ token, user, trigger }) {
@@ -50,13 +60,21 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
         const user = await db.query.users.findFirst({
           where: eq(users.email, parsed.data.email),
         });
-        if (!user) return null;
+        if (!user) {
+          await logger.warn("auth.login.failed", { metadata: { reason: "user_not_found", email: parsed.data.email } });
+          return null;
+        }
 
         const valid = await bcrypt.compare(
           parsed.data.password,
           user.passwordHash
         );
-        if (!valid) return null;
+        if (!valid) {
+          await logger.warn("auth.login.failed", { userId: user.id, metadata: { reason: "wrong_password", email: user.email, displayName: user.displayName } });
+          return null;
+        }
+
+        await logger.info("auth.login.success", { userId: user.id, metadata: { email: user.email, displayName: user.displayName } });
 
         return {
           id: user.id,
