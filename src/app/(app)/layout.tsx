@@ -19,6 +19,7 @@ const NAV_ITEMS = [
   { href: "/calendar",        label: "Kalender",      labelEn: "Calendar",    icon: "▣" },
   { href: "/workout/history", label: "Training",      labelEn: "Workout",     icon: "◫" },
   { href: "/records",         label: "Bestleistungen",labelEn: "Records",     icon: "◆" },
+  { href: "/body",            label: "Körper",        labelEn: "Body",        icon: "●" },
 ];
 
 // route → [section, page] breadcrumb labels
@@ -30,6 +31,7 @@ const CRUMBS: Record<string, [string, string]> = {
   "/workout/history": ["Session",     "History"],
   "/workout":         ["Session",     "Live"],
   "/records":         ["Performance", "Records"],
+  "/body":            ["Progress",    "Body Measurements"],
   "/settings":        ["Account",     "Settings"],
 };
 

@@ -40,6 +40,25 @@ export const users = sqliteTable("users", {
     .$defaultFn(() => new Date().toISOString()),
 });
 
+export const bodyMeasurements = sqliteTable("body_measurements", {
+  id: text("id").primaryKey(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  measuredAt: text("measured_at").notNull(), // YYYY-MM-DD
+  weightKg: real("weight_kg").notNull(),
+  bodyFatPct: real("body_fat_pct"),
+  waistCm: real("waist_cm"),
+  chestCm: real("chest_cm"),
+  hipCm: real("hip_cm"),
+  armCm: real("arm_cm"),
+  thighCm: real("thigh_cm"),
+  notes: text("notes"),
+  createdAt: text("created_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
+});
+
 // Re-export for server-side code that imports from schema
 export { EQUIPMENT_CATEGORIES, EQUIPMENT_CATEGORY_LABELS, type EquipmentCategory };
 
@@ -491,6 +510,14 @@ export const usersRelations = relations(users, ({ many }) => ({
   workoutSessions: many(workoutSessions),
   personalRecords: many(personalRecords),
   chatConversations: many(chatConversations),
+  bodyMeasurements: many(bodyMeasurements),
+}));
+
+export const bodyMeasurementsRelations = relations(bodyMeasurements, ({ one }) => ({
+  user: one(users, {
+    fields: [bodyMeasurements.userId],
+    references: [users.id],
+  }),
 }));
 
 export const trainingPlansRelations = relations(

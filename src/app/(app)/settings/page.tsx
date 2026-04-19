@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
+import Link from "next/link";
 import { cn } from "@/lib/utils/cn";
 import { Input } from "@/components/ui/input";
 import { calculateAge } from "@/lib/utils/age";
@@ -748,6 +749,13 @@ export default function SettingsPage() {
                 onChange={(e) => handleBodyChange("bodyFatPct", e.target.value)}
               />
             </div>
+
+            <Link
+              href="/body"
+              className="mono-text w-fit text-xs uppercase tracking-widest text-primary-container hover:underline"
+            >
+              Verlauf & FFMI ansehen →
+            </Link>
 
             {/* Gender */}
             <div className="flex flex-col gap-1.5">
