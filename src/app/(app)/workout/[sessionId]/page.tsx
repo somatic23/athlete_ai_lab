@@ -182,13 +182,15 @@ function RestTimerBar({ seconds, total, onSkip }: { seconds: number; total: numb
 
 function SetInputForm({
   setNumber,
+  trackingType,
   suggested,
   prevSet,
   onLog,
   isLogging,
 }: {
   setNumber: number;
-  suggested: { weightKg: number | null; repsMin: number; repsMax: number | null };
+  trackingType: "weight_reps" | "duration";
+  suggested: { weightKg: number | null; repsMin: number; repsMax: number | null; targetDurationSeconds: number | null };
   prevSet: LoggedSet | null;
   onLog: (data: Omit<LoggedSet, "localId" | "savedId">) => void;
   isLogging: boolean;
@@ -199,6 +201,13 @@ function SetInputForm({
   const [reps, setReps] = useState(
     String(prevSet?.repsCompleted ?? suggested.repsMin ?? "")
   );
+  const [durationMin, setDurationMin] = useState(
+    prevSet?.durationSeconds != null
+      ? String(prevSet.durationSeconds / 60)
+      : suggested.targetDurationSeconds != null
+        ? String(suggested.targetDurationSeconds / 60)
+        : ""
+  );
   const [rpe, setRpe] = useState<number | null>(prevSet?.rpe ?? null);
   const [outcome, setOutcome] = useState<SetOutcome>("completed");
   const [notes, setNotes] = useState("");
@@ -208,12 +217,18 @@ function SetInputForm({
 
   const wKg = parseFloat(weight) || null;
   const rNum = parseInt(reps) || null;
+  const durSec = durationMin ? Math.round(parseFloat(durationMin) * 60) : null;
   const e1rm = wKg && rNum ? estimated1rm(wKg, rNum) : null;
 
   function handleLog() {
     const resolvedRpe = inputMode === "rir" && rirValue !== null ? rirToRpe(rirValue) : rpe;
     setRirValue(null);
-    onLog({ setNumber, weightKg: wKg, repsCompleted: rNum, rpe: resolvedRpe, outcome, notes, estimated1rm: e1rm ?? undefined });
+    if (trackingType === "duration") {
+      setDurationMin("");
+      onLog({ setNumber, weightKg: null, repsCompleted: null, durationSeconds: durSec, rpe: resolvedRpe, outcome, notes, estimated1rm: undefined });
+    } else {
+      onLog({ setNumber, weightKg: wKg, repsCompleted: rNum, durationSeconds: null, rpe: resolvedRpe, outcome, notes, estimated1rm: e1rm ?? undefined });
+    }
   }
 
   return (
@@ -226,35 +241,52 @@ function SetInputForm({
         )}
       </div>
 
-      {/* Weight + Reps */}
-      <div className="grid grid-cols-2 gap-3">
+      {/* Weight + Reps  OR  Duration */}
+      {trackingType === "duration" ? (
         <div className="flex flex-col gap-1">
-          <label className="text-xs font-mono text-on-surface-variant/60 uppercase">Gewicht (kg)</label>
+          <label className="text-xs font-mono text-on-surface-variant/60 uppercase">
+            Dauer (min){suggested.targetDurationSeconds ? ` · Ziel ${(suggested.targetDurationSeconds / 60).toFixed(1)} min` : ""}
+          </label>
           <input
             type="number"
             inputMode="decimal"
             step="0.5"
-            placeholder={suggested.weightKg ? `${suggested.weightKg}` : "0"}
-            value={weight}
-            onChange={(e) => setWeight(e.target.value)}
-            className="rounded-lg bg-surface-container-high px-3 py-2.5 text-base font-medium text-on-surface placeholder:text-on-surface-variant/30 focus:outline-none focus:ring-1 focus:ring-primary/40"
+            placeholder={suggested.targetDurationSeconds ? String(suggested.targetDurationSeconds / 60) : "1"}
+            value={durationMin}
+            onChange={(e) => setDurationMin(e.target.value)}
+            className="rounded-lg bg-surface-container-high px-3 py-2.5 text-base font-medium text-on-surface placeholder:text-on-surface-variant/30 focus:outline-none focus:ring-1 focus:ring-secondary/40"
           />
         </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-xs font-mono text-on-surface-variant/60 uppercase">
-            Wdh {suggested.repsMin}{suggested.repsMax ? `–${suggested.repsMax}` : ""}
-          </label>
-          <input
-            type="number"
-            inputMode="numeric"
-            step="1"
-            placeholder={`${suggested.repsMin}`}
-            value={reps}
-            onChange={(e) => setReps(e.target.value)}
-            className="rounded-lg bg-surface-container-high px-3 py-2.5 text-base font-medium text-on-surface placeholder:text-on-surface-variant/30 focus:outline-none focus:ring-1 focus:ring-primary/40"
-          />
+      ) : (
+        <div className="grid grid-cols-2 gap-3">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-mono text-on-surface-variant/60 uppercase">Gewicht (kg)</label>
+            <input
+              type="number"
+              inputMode="decimal"
+              step="0.5"
+              placeholder={suggested.weightKg ? `${suggested.weightKg}` : "0"}
+              value={weight}
+              onChange={(e) => setWeight(e.target.value)}
+              className="rounded-lg bg-surface-container-high px-3 py-2.5 text-base font-medium text-on-surface placeholder:text-on-surface-variant/30 focus:outline-none focus:ring-1 focus:ring-primary/40"
+            />
+          </div>
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-mono text-on-surface-variant/60 uppercase">
+              Wdh {suggested.repsMin}{suggested.repsMax ? `–${suggested.repsMax}` : ""}
+            </label>
+            <input
+              type="number"
+              inputMode="numeric"
+              step="1"
+              placeholder={`${suggested.repsMin}`}
+              value={reps}
+              onChange={(e) => setReps(e.target.value)}
+              className="rounded-lg bg-surface-container-high px-3 py-2.5 text-base font-medium text-on-surface placeholder:text-on-surface-variant/30 focus:outline-none focus:ring-1 focus:ring-primary/40"
+            />
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Outcome buttons */}
       <div className="flex flex-col gap-1.5">
@@ -376,13 +408,21 @@ function LoggedSetRow({ set, onRemove }: { set: LoggedSet; onRemove: () => void 
         {set.setNumber}
       </span>
       <div className="flex-1 flex items-center gap-3 min-w-0">
-        <span className="text-base font-bold text-on-surface tabular-nums">
-          {fmtKg(set.weightKg)}
-        </span>
-        <span className="text-on-surface-variant/40 text-sm">×</span>
-        <span className="text-base font-bold text-on-surface tabular-nums">
-          {set.repsCompleted ?? "—"}
-        </span>
+        {set.durationSeconds != null ? (
+          <span className="text-base font-bold text-secondary tabular-nums">
+            {(set.durationSeconds / 60).toFixed(1)} min
+          </span>
+        ) : (
+          <>
+            <span className="text-base font-bold text-on-surface tabular-nums">
+              {fmtKg(set.weightKg)}
+            </span>
+            <span className="text-on-surface-variant/40 text-sm">×</span>
+            <span className="text-base font-bold text-on-surface tabular-nums">
+              {set.repsCompleted ?? "—"}
+            </span>
+          </>
+        )}
         {set.rpe != null && (
           <span className="text-xs font-mono text-on-surface-variant/50 bg-surface-container px-1.5 py-0.5 rounded">
             RPE {set.rpe}
@@ -432,9 +472,11 @@ function ExerciseCard({
       exerciseId: alt.exerciseId,
       name: alt.exerciseName,
       primaryMuscleGroup: alt.primaryMuscleGroup,
+      trackingType: "weight_reps",
       targetSets: alt.sets,
       repsMin: alt.repsMin,
       repsMax: alt.repsMax,
+      targetDurationSeconds: null,
       targetRpe: null,
       restSeconds: exercise.restSeconds,
       suggestedWeightKg: alt.suggestedWeightKg,
@@ -465,6 +507,7 @@ function ExerciseCard({
           setNumber: data.setNumber,
           weightKg: data.weightKg,
           repsCompleted: data.repsCompleted,
+          durationSeconds: data.durationSeconds,
           rpe: data.rpe,
           outcome: data.outcome,
           notes: data.notes || undefined,
@@ -504,8 +547,10 @@ function ExerciseCard({
           <div className="min-w-0">
             <p className="font-semibold text-on-surface truncate">{exercise.name}</p>
             <p className="text-xs text-on-surface-variant/60 font-mono mt-0.5">
-              {exercise.targetSets} × {exercise.repsMin}{exercise.repsMax ? `–${exercise.repsMax}` : ""} Wdh
-              {exercise.suggestedWeightKg ? ` · ${exercise.suggestedWeightKg} kg` : ""}
+              {exercise.trackingType === "duration"
+                ? `${exercise.targetSets} × ${exercise.targetDurationSeconds ? (exercise.targetDurationSeconds / 60).toFixed(1) : "?"} min`
+                : `${exercise.targetSets} × ${exercise.repsMin}${exercise.repsMax ? `–${exercise.repsMax}` : ""} Wdh`}
+              {exercise.trackingType !== "duration" && exercise.suggestedWeightKg ? ` · ${exercise.suggestedWeightKg} kg` : ""}
               {exercise.targetRpe ? ` · RPE ${exercise.targetRpe}` : ""}
             </p>
           </div>
@@ -551,10 +596,12 @@ function ExerciseCard({
           {/* Set input form — always show next set */}
           <SetInputForm
             setNumber={nextSetNumber}
+            trackingType={exercise.trackingType}
             suggested={{
               weightKg: exercise.suggestedWeightKg,
               repsMin: exercise.repsMin,
               repsMax: exercise.repsMax,
+              targetDurationSeconds: exercise.targetDurationSeconds,
             }}
             prevSet={prevSet}
             onLog={handleLog}
@@ -648,9 +695,11 @@ export default function WorkoutPage({ params }: { params: Promise<{ sessionId: s
       exerciseId: ex.id,
       name: parseName(ex.nameI18n),
       primaryMuscleGroup: ex.primaryMuscleGroup,
+      trackingType: (ex as { trackingType?: "weight_reps" | "duration" }).trackingType ?? "weight_reps",
       targetSets: 3,
       repsMin: 8,
       repsMax: 12,
+      targetDurationSeconds: null,
       targetRpe: null,
       restSeconds: 90,
       suggestedWeightKg: null,

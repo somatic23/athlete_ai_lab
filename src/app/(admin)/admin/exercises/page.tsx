@@ -30,6 +30,7 @@ type Exercise = {
   description: I18n;
   primaryMuscleGroup: string;
   imageUrl: string | null;
+  trackingType: "weight_reps" | "duration";
   isActive: boolean;
   requiredEquipmentIds: string | null;
 };
@@ -42,6 +43,7 @@ type FormState = {
   imageUrl: string;
   primaryMuscleGroup: string;
   instructions: string;
+  trackingType: "weight_reps" | "duration";
   isActive: boolean;
   requiredEquipmentIds: string[];
 };
@@ -52,6 +54,7 @@ const empty: FormState = {
   imageUrl: "",
   primaryMuscleGroup: "chest",
   instructions: "",
+  trackingType: "weight_reps",
   isActive: true,
   requiredEquipmentIds: [],
 };
@@ -83,6 +86,7 @@ export default function ExercisesPage() {
       imageUrl: item.imageUrl ?? "",
       primaryMuscleGroup: item.primaryMuscleGroup,
       instructions: "",
+      trackingType: item.trackingType ?? "weight_reps",
       isActive: item.isActive,
       requiredEquipmentIds: eqIds,
     });
@@ -169,6 +173,27 @@ export default function ExercisesPage() {
                     <option key={m.value} value={m.value}>{m.label}</option>
                   ))}
                 </select>
+              </div>
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-medium uppercase tracking-widest text-on-surface-variant">
+                  Tracking-Typ
+                </label>
+                <div className="seg">
+                  <button
+                    type="button"
+                    className={cn(form.trackingType === "weight_reps" && "on")}
+                    onClick={() => setForm((f) => ({ ...f, trackingType: "weight_reps" }))}
+                  >
+                    Gewicht + Wdh.
+                  </button>
+                  <button
+                    type="button"
+                    className={cn(form.trackingType === "duration" && "on")}
+                    onClick={() => setForm((f) => ({ ...f, trackingType: "duration" }))}
+                  >
+                    Dauer (min)
+                  </button>
+                </div>
               </div>
               <div className="grid grid-cols-2 gap-4">
                 <div className="flex flex-col gap-1.5">

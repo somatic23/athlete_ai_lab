@@ -18,8 +18,9 @@ const manualPlanSchema = z.object({
     exercises: z.array(z.object({
       exerciseId: z.string(),
       sets: z.number().int().min(1).max(100),
-      repsMin: z.number().int().min(1).max(999),
-      repsMax: z.number().int().min(1).max(999).optional(),
+      repsMin: z.number().int().min(0).max(999).optional().nullable(),
+      repsMax: z.number().int().min(1).max(999).optional().nullable(),
+      durationSeconds: z.number().int().min(1).max(7200).optional().nullable(),
       restSeconds: z.number().int().min(0).max(3600).optional(),
       notes: z.string().max(500).optional(),
     })),
@@ -108,8 +109,9 @@ export async function POST(req: Request) {
           exerciseId: ex.exerciseId,
           sortOrder: j,
           sets: ex.sets,
-          repsMin: ex.repsMin,
+          repsMin: ex.repsMin ?? 8,
           repsMax: ex.repsMax ?? null,
+          durationSeconds: ex.durationSeconds ?? null,
           restSeconds: ex.restSeconds ?? null,
           notes: ex.notes ?? null,
           createdAt: now,
@@ -174,6 +176,7 @@ export async function POST(req: Request) {
 
     for (let j = 0; j < day.exercises.length; j++) {
       const ex = day.exercises[j];
+      const isDuration = !!ex.durationSeconds;
       const { min, max } = parseReps(ex.reps);
 
       await db.insert(planExercises).values({
@@ -182,8 +185,9 @@ export async function POST(req: Request) {
         exerciseId: ex.exerciseId,
         sortOrder: j,
         sets: ex.sets,
-        repsMin: min,
-        repsMax: max,
+        repsMin: isDuration ? 0 : min,
+        repsMax: isDuration ? null : max,
+        durationSeconds: ex.durationSeconds ?? null,
         restSeconds: ex.restSeconds,
         notes: ex.notes || ex.weightSuggestion || null,
         createdAt: now,

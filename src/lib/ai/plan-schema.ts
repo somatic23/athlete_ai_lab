@@ -4,7 +4,9 @@ export const planExerciseSchema = z.object({
   exerciseId:       z.string().describe("ID from the exercise catalog"),
   exerciseName:     z.string().describe("Human-readable exercise name"),
   sets:             z.number().int().min(1).max(10),
-  reps:             z.string().describe('Rep range as string, e.g. "8-12" or "5"'),
+  reps:             z.string().describe('Rep range as string, e.g. "8-12" or "5". Use "0" for duration-based exercises.'),
+  durationSeconds:  z.number().int().min(10).max(7200).nullable().optional()
+                      .describe("For time-based exercises (e.g. Plank, Laufen): target duration in seconds. Leave null for weight/reps exercises."),
   weightSuggestion: z.string().describe('e.g. "60 kg", "Bodyweight", "Start light"'),
   restSeconds:      z.number().int().min(30).max(300),
   notes:            z.string().describe("Technique cues or special instructions"),

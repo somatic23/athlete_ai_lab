@@ -96,6 +96,9 @@ export const exercises = sqliteTable("exercises", {
   secondaryMuscleGroups: text("secondary_muscle_groups"), // JSON array
   requiredEquipmentIds: text("required_equipment_ids"), // JSON array
   instructions: text("instructions"),
+  trackingType: text("tracking_type", { enum: ["weight_reps", "duration"] })
+    .notNull()
+    .default("weight_reps"),
   isActive: integer("is_active", { mode: "boolean" }).notNull().default(true),
   createdAt: text("created_at")
     .notNull()
@@ -185,6 +188,7 @@ export const planExercises = sqliteTable("plan_exercises", {
   sets: integer("sets").notNull().default(3),
   repsMin: integer("reps_min").notNull().default(8),
   repsMax: integer("reps_max").default(12),
+  durationSeconds: integer("duration_seconds"),
   targetRpe: real("target_rpe"),
   restSeconds: integer("rest_seconds").default(90),
   tempo: text("tempo"),
@@ -287,6 +291,7 @@ export const workoutSets = sqliteTable("workout_sets", {
     .notNull()
     .default("completed"),
   tempo: text("tempo"),
+  durationSeconds: integer("duration_seconds"),
   restBeforeSeconds: integer("rest_before_seconds"),
   timeUnderTensionSeconds: integer("time_under_tension_seconds"),
   notes: text("notes"),

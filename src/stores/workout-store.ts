@@ -8,6 +8,7 @@ export type LoggedSet = {
   setNumber: number;
   weightKg: number | null;
   repsCompleted: number | null;
+  durationSeconds: number | null;
   rpe: number | null;
   outcome: SetOutcome;
   notes: string;
@@ -21,9 +22,11 @@ export type WorkoutExercise = {
   exerciseId: string;
   name: string;
   primaryMuscleGroup: string;
+  trackingType: "weight_reps" | "duration";
   targetSets: number;
   repsMin: number;
   repsMax: number | null;
+  targetDurationSeconds: number | null;
   targetRpe: number | null;
   restSeconds: number | null;
   suggestedWeightKg: number | null;

@@ -12,15 +12,18 @@ type CatalogExercise = {
   id: string;
   nameI18n: string;
   primaryMuscleGroup: string;
+  trackingType: "weight_reps" | "duration";
 };
 
 type PlanExRow = {
   uid: string;
   exerciseId: string;
   exerciseName: string;
+  trackingType: "weight_reps" | "duration";
   sets: number | "";
   repsMin: number | "";
   repsMax: number | "";
+  durationSeconds: number | "";
   restSeconds: number | "";
   notes: string;
 };
@@ -64,9 +67,11 @@ function emptyExRow(ex: CatalogExercise): PlanExRow {
     uid: mkId(),
     exerciseId: ex.id,
     exerciseName: parseName(ex.nameI18n),
+    trackingType: ex.trackingType ?? "weight_reps",
     sets: 3,
     repsMin: 8,
     repsMax: 12,
+    durationSeconds: "",
     restSeconds: 90,
     notes: "",
   };
@@ -165,27 +170,44 @@ function ExerciseRowEditor({
             className="w-full rounded-md bg-surface-container-highest px-2 py-1.5 text-sm text-on-surface text-center outline-none focus:bg-surface-bright transition-colors"
           />
         </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-xs text-on-surface-variant/70">Wdh. min</label>
-          <input
-            type="number"
-            min={1}
-            value={row.repsMin}
-            onChange={(e) => onChange({ repsMin: e.target.value === "" ? "" : parseInt(e.target.value) })}
-            className="w-full rounded-md bg-surface-container-highest px-2 py-1.5 text-sm text-on-surface text-center outline-none focus:bg-surface-bright transition-colors"
-          />
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-xs text-on-surface-variant/70">Wdh. max</label>
-          <input
-            type="number"
-            min={1}
-            value={row.repsMax}
-            onChange={(e) => onChange({ repsMax: e.target.value === "" ? "" : parseInt(e.target.value) })}
-            placeholder="—"
-            className="w-full rounded-md bg-surface-container-highest px-2 py-1.5 text-sm text-on-surface text-center outline-none focus:bg-surface-bright transition-colors placeholder:text-on-surface-variant/30"
-          />
-        </div>
+        {row.trackingType === "duration" ? (
+          <div className="col-span-2 flex flex-col gap-1">
+            <label className="text-xs text-on-surface-variant/70">Dauer (min)</label>
+            <input
+              type="number"
+              min={0.5}
+              step={0.5}
+              value={row.durationSeconds !== "" ? row.durationSeconds / 60 : ""}
+              onChange={(e) => onChange({ durationSeconds: e.target.value === "" ? "" : Math.round(parseFloat(e.target.value) * 60) })}
+              placeholder="1"
+              className="w-full rounded-md bg-surface-container-highest px-2 py-1.5 text-sm text-on-surface text-center outline-none focus:bg-surface-bright transition-colors"
+            />
+          </div>
+        ) : (
+          <>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-on-surface-variant/70">Wdh. min</label>
+              <input
+                type="number"
+                min={1}
+                value={row.repsMin}
+                onChange={(e) => onChange({ repsMin: e.target.value === "" ? "" : parseInt(e.target.value) })}
+                className="w-full rounded-md bg-surface-container-highest px-2 py-1.5 text-sm text-on-surface text-center outline-none focus:bg-surface-bright transition-colors"
+              />
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-xs text-on-surface-variant/70">Wdh. max</label>
+              <input
+                type="number"
+                min={1}
+                value={row.repsMax}
+                onChange={(e) => onChange({ repsMax: e.target.value === "" ? "" : parseInt(e.target.value) })}
+                placeholder="—"
+                className="w-full rounded-md bg-surface-container-highest px-2 py-1.5 text-sm text-on-surface text-center outline-none focus:bg-surface-bright transition-colors placeholder:text-on-surface-variant/30"
+              />
+            </div>
+          </>
+        )}
         <div className="flex flex-col gap-1">
           <label className="text-xs text-on-surface-variant/70">Pause (s)</label>
           <input
@@ -381,8 +403,9 @@ export default function ManualPlanPage() {
           exercises: d.exercises.map((e) => ({
             exerciseId: e.exerciseId,
             sets: typeof e.sets === "number" ? e.sets : 3,
-            repsMin: typeof e.repsMin === "number" ? e.repsMin : 8,
-            repsMax: typeof e.repsMax === "number" ? e.repsMax : undefined,
+            repsMin: e.trackingType === "duration" ? 0 : (typeof e.repsMin === "number" ? e.repsMin : 8),
+            repsMax: e.trackingType === "duration" ? undefined : (typeof e.repsMax === "number" ? e.repsMax : undefined),
+            durationSeconds: e.trackingType === "duration" ? (typeof e.durationSeconds === "number" ? e.durationSeconds : undefined) : undefined,
             restSeconds: typeof e.restSeconds === "number" ? e.restSeconds : undefined,
             notes: e.notes || undefined,
           })),

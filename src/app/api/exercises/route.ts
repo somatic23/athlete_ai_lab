@@ -17,6 +17,7 @@ export async function GET() {
       id: true,
       nameI18n: true,
       primaryMuscleGroup: true,
+      trackingType: true,
     },
   });
 

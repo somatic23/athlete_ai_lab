@@ -22,6 +22,7 @@ const schema = z.object({
   secondaryMuscleGroups: z.array(z.string()).optional(),
   requiredEquipmentIds: z.array(z.string()).optional(),
   instructions: z.string().optional(),
+  trackingType: z.enum(["weight_reps", "duration"]).optional().default("weight_reps"),
   isActive: z.boolean().optional().default(true),
 });
 

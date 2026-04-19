@@ -31,10 +31,11 @@ type PlanExercise = {
   sets: number;
   repsMin: number;
   repsMax: number | null;
+  durationSeconds: number | null;
   restSeconds: number | null;
   suggestedWeightKg: number | null;
   notes: string | null;
-  exercise: { id: string; nameI18n: string; primaryMuscleGroup: string };
+  exercise: { id: string; nameI18n: string; primaryMuscleGroup: string; trackingType: "weight_reps" | "duration" };
 };
 
 type TrainingDay = {
@@ -66,9 +67,11 @@ type EditExercise = {
   exerciseId: string;
   exerciseName: string;
   primaryMuscleGroup: string;
+  trackingType: "weight_reps" | "duration";
   sets: number | "";
   repsMin: number | "";
   repsMax: number | "";
+  durationSeconds: number | "";
   restSeconds: number | "";
   suggestedWeightKg: number | "";
   notes: string;
@@ -86,6 +89,7 @@ type CatalogExercise = {
   id: string;
   nameI18n: string;
   primaryMuscleGroup: string;
+  trackingType: "weight_reps" | "duration";
 };
 
 // ── Helpers ────────────────────────────────────────────────────────────
@@ -124,9 +128,11 @@ function toEditDays(days: TrainingDay[]): EditDay[] {
       exerciseId: ex.exercise.id,
       exerciseName: parseName(ex.exercise.nameI18n),
       primaryMuscleGroup: ex.exercise.primaryMuscleGroup,
+      trackingType: ex.exercise.trackingType ?? "weight_reps",
       sets: ex.sets,
       repsMin: ex.repsMin,
       repsMax: ex.repsMax ?? "",
+      durationSeconds: ex.durationSeconds ?? "",
       restSeconds: ex.restSeconds ?? "",
       suggestedWeightKg: ex.suggestedWeightKg ?? "",
       notes: ex.notes ?? "",
@@ -145,10 +151,11 @@ function toApiPayload(title: string, description: string, days: EditDay[]) {
       exercises: d.exercises.map((e) => ({
         exerciseId: e.exerciseId,
         sets: typeof e.sets === "number" ? e.sets : 3,
-        repsMin: typeof e.repsMin === "number" ? e.repsMin : 8,
-        repsMax: typeof e.repsMax === "number" ? e.repsMax : undefined,
+        repsMin: e.trackingType === "duration" ? 0 : (typeof e.repsMin === "number" ? e.repsMin : 8),
+        repsMax: e.trackingType === "duration" ? undefined : (typeof e.repsMax === "number" ? e.repsMax : undefined),
+        durationSeconds: e.trackingType === "duration" ? (typeof e.durationSeconds === "number" ? e.durationSeconds : undefined) : undefined,
         restSeconds: typeof e.restSeconds === "number" ? e.restSeconds : undefined,
-        suggestedWeightKg: typeof e.suggestedWeightKg === "number" ? e.suggestedWeightKg : undefined,
+        suggestedWeightKg: e.trackingType === "duration" ? undefined : (typeof e.suggestedWeightKg === "number" ? e.suggestedWeightKg : undefined),
         notes: e.notes || undefined,
       })),
     })),
@@ -278,18 +285,34 @@ function SortableExRow({ ex, onChange, onRemove }: {
           <label className="text-center text-xs text-on-surface-variant/60">Sets</label>
           {numInput(ex.sets, "sets", { min: 1 })}
         </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-center text-xs text-on-surface-variant/60">Wdh. min</label>
-          {numInput(ex.repsMin, "repsMin", { min: 1 })}
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-center text-xs text-on-surface-variant/60">Wdh. max</label>
-          {numInput(ex.repsMax, "repsMax", { min: 1, placeholder: "—" })}
-        </div>
-        <div className="flex flex-col gap-1">
-          <label className="text-center text-xs text-on-surface-variant/60">Gewicht (kg)</label>
-          {numInput(ex.suggestedWeightKg, "suggestedWeightKg", { min: 0, step: 0.5, placeholder: "—" }, true)}
-        </div>
+        {ex.trackingType === "duration" ? (
+          <div className="col-span-3 flex flex-col gap-1">
+            <label className="text-center text-xs text-on-surface-variant/60">Dauer (min)</label>
+            <input
+              type="number"
+              min={0.5}
+              step={0.5}
+              value={ex.durationSeconds !== "" ? ex.durationSeconds / 60 : ""}
+              onChange={(e) => onChange({ durationSeconds: e.target.value === "" ? "" : Math.round(parseFloat(e.target.value) * 60) } as Partial<EditExercise>)}
+              className="w-full rounded-md bg-surface-container-highest px-2 py-1.5 text-center text-sm text-on-surface outline-none focus:bg-surface-bright transition-colors"
+            />
+          </div>
+        ) : (
+          <>
+            <div className="flex flex-col gap-1">
+              <label className="text-center text-xs text-on-surface-variant/60">Wdh. min</label>
+              {numInput(ex.repsMin, "repsMin", { min: 1 })}
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-center text-xs text-on-surface-variant/60">Wdh. max</label>
+              {numInput(ex.repsMax, "repsMax", { min: 1, placeholder: "—" })}
+            </div>
+            <div className="flex flex-col gap-1">
+              <label className="text-center text-xs text-on-surface-variant/60">Gewicht (kg)</label>
+              {numInput(ex.suggestedWeightKg, "suggestedWeightKg", { min: 0, step: 0.5, placeholder: "—" }, true)}
+            </div>
+          </>
+        )}
         <div className="flex flex-col gap-1">
           <label className="text-center text-xs text-on-surface-variant/60">Pause (s)</label>
           {numInput(ex.restSeconds, "restSeconds", { min: 0, step: 15 })}
@@ -603,8 +626,12 @@ function DaySection({ day, planId, onPlanRefresh }: {
                     <p className="text-sm font-medium text-on-surface">{parseName(ex.exercise.nameI18n)}</p>
                     {ex.notes && <p className="text-xs text-on-surface-variant mt-0.5 truncate">{ex.notes}</p>}
                   </div>
-                  <span className="w-16 text-right text-xs font-mono text-on-surface-variant">{ex.sets}×{repsLabel(ex.repsMin, ex.repsMax)}</span>
-                  <span className="w-16 text-right text-xs font-mono text-on-surface-variant">{ex.suggestedWeightKg ? `${ex.suggestedWeightKg} kg` : "—"}</span>
+                  <span className="w-16 text-right text-xs font-mono text-on-surface-variant">
+                    {ex.exercise.trackingType === "duration"
+                      ? `${ex.sets}×${ex.durationSeconds != null ? (ex.durationSeconds / 60).toFixed(1) : "?"}min`
+                      : `${ex.sets}×${repsLabel(ex.repsMin, ex.repsMax)}`}
+                  </span>
+                  <span className="w-16 text-right text-xs font-mono text-on-surface-variant">{ex.exercise.trackingType === "duration" ? "—" : (ex.suggestedWeightKg ? `${ex.suggestedWeightKg} kg` : "—")}</span>
                   <span className="w-12 text-right text-xs font-mono text-on-surface-variant">{ex.restSeconds ? `${ex.restSeconds}s` : "—"}</span>
                   <span className="w-24 text-right text-xs font-mono text-secondary">{MUSCLE_LABELS[ex.exercise.primaryMuscleGroup] ?? ex.exercise.primaryMuscleGroup}</span>
                 </div>
@@ -740,8 +767,9 @@ export default function PlanDetailPage() {
   }, []);
 
   const addExercise = useCallback((dayUid: string, ex: CatalogExercise) => {
+    const trackingType = ex.trackingType ?? "weight_reps";
     setEditDays((prev) => prev.map((d) =>
-      d.uid === dayUid ? { ...d, exercises: [...d.exercises, { uid: mkId(), exerciseId: ex.id, exerciseName: parseName(ex.nameI18n), primaryMuscleGroup: ex.primaryMuscleGroup, sets: 3, repsMin: 8, repsMax: 12, restSeconds: 90, suggestedWeightKg: "", notes: "" }] } : d
+      d.uid === dayUid ? { ...d, exercises: [...d.exercises, { uid: mkId(), exerciseId: ex.id, exerciseName: parseName(ex.nameI18n), primaryMuscleGroup: ex.primaryMuscleGroup, trackingType, sets: 3, repsMin: 8, repsMax: 12, durationSeconds: "", restSeconds: 90, suggestedWeightKg: "", notes: "" }] } : d
     ));
   }, []);
 

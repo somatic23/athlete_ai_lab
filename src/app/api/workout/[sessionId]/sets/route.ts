@@ -15,6 +15,7 @@ const setSchema = z.object({
   setNumber: z.number().int().min(1),
   weightKg: z.number().positive().nullable().optional(),
   repsCompleted: z.number().int().min(0).nullable().optional(),
+  durationSeconds: z.number().int().min(1).nullable().optional(),
   rpe: z.number().min(1).max(10).nullable().optional(),
   outcome: z.enum(["completed", "failure", "partial", "skipped"]).default("completed"),
   notes: z.string().max(500).optional(),
@@ -44,7 +45,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     return NextResponse.json({ error: parsed.error.issues[0]?.message ?? "Invalid" }, { status: 400 });
   }
 
-  const { exerciseId, planExerciseId, setNumber, weightKg, repsCompleted, rpe, outcome, notes, restBeforeSeconds } = parsed.data;
+  const { exerciseId, planExerciseId, setNumber, weightKg, repsCompleted, durationSeconds, rpe, outcome, notes, restBeforeSeconds } = parsed.data;
   const id = randomUUID();
   const now = new Date().toISOString();
 
@@ -56,6 +57,7 @@ export async function POST(req: NextRequest, { params }: Params) {
     setNumber,
     weightKg: weightKg ?? null,
     repsCompleted: repsCompleted ?? null,
+    durationSeconds: durationSeconds ?? null,
     targetReps: null,
     rpe: rpe ?? null,
     outcome,

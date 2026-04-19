@@ -73,9 +73,11 @@ export async function POST(req: NextRequest) {
     exerciseId: string;
     name: string;
     primaryMuscleGroup: string;
+    trackingType: "weight_reps" | "duration";
     targetSets: number;
     repsMin: number;
     repsMax: number | null;
+    targetDurationSeconds: number | null;
     targetRpe: number | null;
     restSeconds: number | null;
     suggestedWeightKg: number | null;
@@ -101,9 +103,11 @@ export async function POST(req: NextRequest) {
           exerciseId: pe.exerciseId,
           name: names.de || names.en || "Übung",
           primaryMuscleGroup: pe.exercise.primaryMuscleGroup ?? "full_body",
+          trackingType: pe.exercise.trackingType as "weight_reps" | "duration",
           targetSets: pe.sets,
-          repsMin: pe.repsMin,
+          repsMin: pe.repsMin ?? 8,
           repsMax: pe.repsMax ?? null,
+          targetDurationSeconds: pe.durationSeconds ?? null,
           targetRpe: pe.targetRpe ?? null,
           restSeconds: pe.restSeconds ?? null,
           suggestedWeightKg: pe.suggestedWeightKg ?? null,
