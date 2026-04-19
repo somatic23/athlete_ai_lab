@@ -54,6 +54,13 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: message }, { status: 503 });
   }
 
+  const systemPrompt = buildPlanCreationSystemPrompt(
+    user,
+    userEquipmentList,
+    allExercises,
+    userLocale,
+  );
+
   await logger.info("plan.chat.request", {
     userId,
     metadata: {
@@ -61,6 +68,8 @@ export async function POST(req: Request) {
       model: activeProvider?.modelId ?? "unknown",
       messageCount: messages?.length ?? 0,
       locale: userLocale,
+      systemPrompt,
+      messages,
     },
   });
 
@@ -68,18 +77,13 @@ export async function POST(req: Request) {
 
   const result = streamText({
     model,
-    system: buildPlanCreationSystemPrompt(
-      user,
-      userEquipmentList,
-      allExercises,
-      userLocale,
-    ),
+    system: systemPrompt,
     messages: await convertToModelMessages(messages),
     tools: { proposeTrainingPlan: proposeTrainingPlanTool },
     stopWhen: stepCountIs(2),
     maxOutputTokens: 4096,
 
-    onFinish: async ({ usage, finishReason, warnings }) => {
+    onFinish: async ({ text, usage, finishReason, warnings }) => {
       await logger.info("plan.chat.response", {
         userId,
         metadata: {
@@ -89,6 +93,7 @@ export async function POST(req: Request) {
           durationMs: Date.now() - requestedAt,
           inputTokens: usage?.inputTokens ?? null,
           outputTokens: usage?.outputTokens ?? null,
+          responseText: text,
           warnings: warnings?.length ? warnings : undefined,
         },
       });

@@ -16,10 +16,6 @@ export async function POST(req: Request) {
 
   const userId = session.user.id;
   const { messages } = await req.json();
-  const lastUserMessage: string =
-    messages?.findLast?.((m: { role: string; parts?: { type: string; text?: string }[] }) =>
-      m.role === "user"
-    )?.parts?.find((p: { type: string; text?: string }) => p.type === "text")?.text ?? "(empty)";
 
   // Resolve provider info for logging
   const activeProvider = await db.query.aiProviders.findFirst({
@@ -43,17 +39,6 @@ export async function POST(req: Request) {
   const userEquipmentList = userEquipmentRows.map((r) => r.eq);
 
   const userLocale = (user?.preferredLocale ?? "de") as "de" | "en";
-
-  await logger.info("chat.request", {
-    userId,
-    metadata: {
-      provider: activeProvider?.provider ?? "unknown",
-      model: activeProvider?.modelId ?? "unknown",
-      messageCount: messages?.length ?? 0,
-      lastUserMessage: lastUserMessage.slice(0, 200),
-      locale: userLocale,
-    },
-  });
 
   // JWT is valid but user no longer exists in DB (e.g. after a DB reset).
   // Force re-login so a fresh JWT is issued.
@@ -80,11 +65,24 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: message }, { status: 503 });
   }
 
+  const systemPrompt = buildCoachSystemPrompt(user ?? null, userEquipmentList, allExercises, userLocale);
+
+  await logger.info("chat.request", {
+    userId,
+    metadata: {
+      provider: activeProvider?.provider ?? "unknown",
+      model: activeProvider?.modelId ?? "unknown",
+      messageCount: messages?.length ?? 0,
+      systemPrompt,
+      messages,
+    },
+  });
+
   const requestedAt = Date.now();
 
   const result = streamText({
     model,
-    system: buildCoachSystemPrompt(user ?? null, userEquipmentList, allExercises, userLocale),
+    system: systemPrompt,
     messages: await convertToModelMessages(messages),
     maxOutputTokens: 2048,
 
@@ -99,7 +97,7 @@ export async function POST(req: Request) {
           durationMs,
           inputTokens: usage?.inputTokens ?? null,
           outputTokens: usage?.outputTokens ?? null,
-          responsePreview: text.slice(0, 300),
+          responseText: text,
           warnings: warnings?.length ? warnings : undefined,
         },
       });
