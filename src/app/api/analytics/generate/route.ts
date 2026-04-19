@@ -218,12 +218,9 @@ export async function POST(req: NextRequest) {
   type Analysis = z.infer<typeof analysisSchema>;
   let result: { object: Analysis } | null = null;
   try {
-    // mode: "json" injects the schema into the prompt instead of using tool calls —
-    // compatible with any model, including those without function-calling support.
     result = await generateObject({
       model,
       schema: analysisSchema,
-      mode: "json",
       system: systemPrompt,
       prompt: userPrompt,
     });

@@ -239,7 +239,7 @@ export async function POST(req: NextRequest, { params }: Params) {
 
     let result: { object: Analysis } | null = null;
     try {
-      result = await generateObject({ model, schema: analysisSchema, mode: "json", system: systemPrompt, prompt: userPrompt });
+      result = await generateObject({ model, schema: analysisSchema, system: systemPrompt, prompt: userPrompt });
     } catch (genObjErr) {
       await logger.warn("ai_analysis:post_workout:generateObject_failed", {
         userId: session.user.id,

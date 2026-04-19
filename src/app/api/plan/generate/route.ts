@@ -98,13 +98,9 @@ export async function POST(req: Request) {
 
   // ── Attempt 1: generateObject with schema enforcement ──────────────────────
   try {
-    const { object } = await generateObject({
-      model,
-      schema: generatedPlanSchema,
-      ...(isChatMode
-        ? { system: systemForGenerate, messages: messagesForGenerate }
-        : { prompt: promptForGenerate }),
-    });
+    const { object } = isChatMode
+      ? await generateObject({ model, schema: generatedPlanSchema, system: systemForGenerate, messages: messagesForGenerate! })
+      : await generateObject({ model, schema: generatedPlanSchema, prompt: promptForGenerate! });
 
     await logger.info("plan.generate.success", {
       userId,
@@ -135,23 +131,15 @@ export async function POST(req: Request) {
 
   const retryMessages = isChatMode
     ? [
-        ...(messagesForGenerate ?? []),
+        ...(messagesForGenerate!),
         { role: "user" as const, content: [{ type: "text" as const, text: retryInstruction }] },
       ]
-    : undefined;
-
-  const retryPrompt = isChatMode
-    ? undefined
-    : `${promptForGenerate}\n\n${retryInstruction}`;
+    : null;
 
   try {
-    const { text } = await generateText({
-      model,
-      maxOutputTokens: 4096,
-      ...(isChatMode
-        ? { system: systemForGenerate, messages: retryMessages }
-        : { prompt: retryPrompt }),
-    });
+    const { text } = isChatMode
+      ? await generateText({ model, maxOutputTokens: 4096, system: systemForGenerate, messages: retryMessages! })
+      : await generateText({ model, maxOutputTokens: 4096, prompt: `${promptForGenerate}\n\n${retryInstruction}` });
 
     const extracted = extractJson(text);
     const parsed = JSON.parse(extracted);

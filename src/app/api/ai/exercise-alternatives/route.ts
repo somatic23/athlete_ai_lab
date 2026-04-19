@@ -165,7 +165,7 @@ ${schemaExample}`;
   let result: AiResult | null = null;
 
   try {
-    const r = await generateObject({ model, schema: responseSchema, mode: "json", system: systemPrompt, prompt: userPrompt });
+    const r = await generateObject({ model, schema: responseSchema, system: systemPrompt, prompt: userPrompt });
     result = r.object;
   } catch (genObjErr) {
     await logger.warn("ai:exercise_alternatives:generateObject_failed", {

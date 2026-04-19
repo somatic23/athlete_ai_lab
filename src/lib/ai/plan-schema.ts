@@ -8,7 +8,7 @@ export const planExerciseSchema = z.object({
   durationSeconds:  z.number().int().min(10).max(7200).nullable().optional()
                       .describe("For time-based exercises (e.g. Plank, Laufen): target duration in seconds. Leave null for weight/reps exercises."),
   weightSuggestion: z.string().describe('e.g. "60 kg", "Bodyweight", "Start light"'),
-  restSeconds:      z.number().int().min(30).max(300),
+  restSeconds:      z.number().int().min(0).max(300),
   notes:            z.string().describe("Technique cues or special instructions"),
 });
 

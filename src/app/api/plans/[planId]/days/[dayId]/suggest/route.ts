@@ -177,7 +177,7 @@ export async function POST(_req: NextRequest, { params }: Params) {
   let result: AiResult | null = null;
 
   try {
-    result = await generateObject({ model, schema: coachingSuggestionAiSchema, mode: "json", system: systemPrompt, prompt: userPrompt });
+    result = await generateObject({ model, schema: coachingSuggestionAiSchema, system: systemPrompt, prompt: userPrompt });
   } catch (genObjErr) {
     await logger.warn("ai:coaching_suggestion:generateObject_failed", {
       userId: session.user.id,
