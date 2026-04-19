@@ -931,7 +931,7 @@ export default function SettingsPage() {
                   )}
 
                   {/* Items */}
-                  <div className="px-4 pb-4 max-h-72 overflow-y-auto no-scrollbar">
+                  <div className="px-4 pb-4 max-h-150 overflow-y-auto no-scrollbar">
                     {filtered.length === 0 ? (
                       <p className="text-xs text-on-surface-variant/50 py-4 text-center">Keine Treffer</p>
                     ) : showGrouped ? (
