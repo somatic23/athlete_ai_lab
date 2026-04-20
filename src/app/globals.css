@@ -306,6 +306,11 @@ body {
   animation: pulse-dot 1.6s ease-in-out infinite;
 }
 
+/* Hide native number spinners (used in stepper inputs) */
+.no-spinner::-webkit-outer-spin-button,
+.no-spinner::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+.no-spinner { -moz-appearance: textfield; }
+
 /* Chat typing bounce */
 @keyframes typing-bounce {
   0%, 60%, 100% { transform: translateY(0); opacity: 0.5; }

@@ -220,6 +220,23 @@ function SetInputForm({
   const durSec = durationMin ? Math.round(parseFloat(durationMin) * 60) : null;
   const e1rm = wKg && rNum ? estimated1rm(wKg, rNum) : null;
 
+  function adjustWeight(delta: number) {
+    const current = parseFloat(weight) || 0;
+    const next = Math.max(0, Math.round((current + delta) * 10) / 10);
+    setWeight(String(next));
+  }
+
+  function adjustReps(delta: number) {
+    const current = parseInt(reps) || 0;
+    setReps(String(Math.max(1, current + delta)));
+  }
+
+  function adjustDuration(delta: number) {
+    const current = parseFloat(durationMin) || 0;
+    const next = Math.max(0.5, Math.round((current + delta) * 10) / 10);
+    setDurationMin(String(next));
+  }
+
   function handleLog() {
     const resolvedRpe = inputMode === "rir" && rirValue !== null ? rirToRpe(rirValue) : rpe;
     setRirValue(null);
@@ -247,43 +264,55 @@ function SetInputForm({
           <label className="text-xs font-mono text-on-surface-variant/60 uppercase">
             Dauer (min){suggested.targetDurationSeconds ? ` · Ziel ${(suggested.targetDurationSeconds / 60).toFixed(1)} min` : ""}
           </label>
-          <input
-            type="number"
-            inputMode="decimal"
-            step="0.5"
-            placeholder={suggested.targetDurationSeconds ? String(suggested.targetDurationSeconds / 60) : "1"}
-            value={durationMin}
-            onChange={(e) => setDurationMin(e.target.value)}
-            className="rounded-lg bg-surface-container-high px-3 py-2.5 text-base font-medium text-on-surface placeholder:text-on-surface-variant/30 focus:outline-none focus:ring-1 focus:ring-secondary/40"
-          />
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 gap-3">
-          <div className="flex flex-col gap-1">
-            <label className="text-xs font-mono text-on-surface-variant/60 uppercase">Gewicht (kg)</label>
+          <div className="flex items-center rounded-lg bg-surface-container-high overflow-hidden">
+            <StepBtn onClick={() => adjustDuration(-0.5)}>−</StepBtn>
             <input
               type="number"
               inputMode="decimal"
               step="0.5"
-              placeholder={suggested.weightKg ? `${suggested.weightKg}` : "0"}
-              value={weight}
-              onChange={(e) => setWeight(e.target.value)}
-              className="rounded-lg bg-surface-container-high px-3 py-2.5 text-base font-medium text-on-surface placeholder:text-on-surface-variant/30 focus:outline-none focus:ring-1 focus:ring-primary/40"
+              placeholder={suggested.targetDurationSeconds ? String(suggested.targetDurationSeconds / 60) : "1"}
+              value={durationMin}
+              onChange={(e) => setDurationMin(e.target.value)}
+              className="flex-1 bg-transparent py-2.5 text-base font-medium text-center text-on-surface placeholder:text-on-surface-variant/30 focus:outline-none no-spinner"
             />
+            <StepBtn onClick={() => adjustDuration(0.5)}>+</StepBtn>
+          </div>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3">
+          <div className="flex flex-col gap-1">
+            <label className="text-xs font-mono text-on-surface-variant/60 uppercase">Gewicht (kg)</label>
+            <div className="flex items-center rounded-lg bg-surface-container-high overflow-hidden">
+              <StepBtn onClick={() => adjustWeight(-2.5)}>−</StepBtn>
+              <input
+                type="number"
+                inputMode="decimal"
+                step="0.5"
+                placeholder={suggested.weightKg ? `${suggested.weightKg}` : "0"}
+                value={weight}
+                onChange={(e) => setWeight(e.target.value)}
+                className="flex-1 bg-transparent py-2.5 text-base font-medium text-center text-on-surface placeholder:text-on-surface-variant/30 focus:outline-none no-spinner"
+              />
+              <StepBtn onClick={() => adjustWeight(2.5)}>+</StepBtn>
+            </div>
           </div>
           <div className="flex flex-col gap-1">
             <label className="text-xs font-mono text-on-surface-variant/60 uppercase">
               Wdh {suggested.repsMin}{suggested.repsMax ? `–${suggested.repsMax}` : ""}
             </label>
-            <input
-              type="number"
-              inputMode="numeric"
-              step="1"
-              placeholder={`${suggested.repsMin}`}
-              value={reps}
-              onChange={(e) => setReps(e.target.value)}
-              className="rounded-lg bg-surface-container-high px-3 py-2.5 text-base font-medium text-on-surface placeholder:text-on-surface-variant/30 focus:outline-none focus:ring-1 focus:ring-primary/40"
-            />
+            <div className="flex items-center rounded-lg bg-surface-container-high overflow-hidden">
+              <StepBtn onClick={() => adjustReps(-1)}>−</StepBtn>
+              <input
+                type="number"
+                inputMode="numeric"
+                step="1"
+                placeholder={`${suggested.repsMin}`}
+                value={reps}
+                onChange={(e) => setReps(e.target.value)}
+                className="flex-1 bg-transparent py-2.5 text-base font-medium text-center text-on-surface placeholder:text-on-surface-variant/30 focus:outline-none no-spinner"
+              />
+              <StepBtn onClick={() => adjustReps(1)}>+</StepBtn>
+            </div>
           </div>
         </div>
       )}
@@ -856,5 +885,19 @@ export default function WorkoutPage({ params }: { params: Promise<{ sessionId: s
         />
       )}
     </div>
+  );
+}
+
+// ── StepBtn ───────────────────────────────────────────────────────────
+
+function StepBtn({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onPointerDown={(e) => { e.preventDefault(); onClick(); }}
+      className="flex h-full w-12 shrink-0 items-center justify-center text-xl font-bold text-on-surface-variant active:bg-surface-bright select-none"
+    >
+      {children}
+    </button>
   );
 }
