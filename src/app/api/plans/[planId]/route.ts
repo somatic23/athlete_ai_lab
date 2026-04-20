@@ -152,6 +152,19 @@ export async function PATCH(req: Request, { params }: Params) {
     updates.status = body.status as "draft" | "active" | "scheduled" | "archived";
   }
 
+  // Deactivate all other plans before activating this one
+  if (updates.status === "active") {
+    await db
+      .update(trainingPlans)
+      .set({ status: "draft", updatedAt: now })
+      .where(
+        and(
+          eq(trainingPlans.userId, session.user.id),
+          eq(trainingPlans.status, "active")
+        )
+      );
+  }
+
   await db
     .update(trainingPlans)
     .set({ ...updates, updatedAt: now })

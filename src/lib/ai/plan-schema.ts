@@ -16,7 +16,7 @@ export const planDaySchema = z.object({
   dayName:                  z.string().describe('e.g. "Tag A – Brust & Trizeps"'),
   focus:                    z.string().describe("Primary muscle groups trained"),
   estimatedDurationMinutes: z.number().int().min(30).max(120),
-  exercises:                z.array(planExerciseSchema).min(3).max(8),
+  exercises:                z.array(planExerciseSchema).min(1).max(8),
 });
 
 export const generatedPlanSchema = z.object({

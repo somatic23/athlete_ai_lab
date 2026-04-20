@@ -394,12 +394,14 @@ const COMPETENCIES: Record<Locale, string> = {
 - Biomechanik und Technikoptimierung
 - Ernaehrungsprinzipien fuer Kraft- und Hypertrophieziele
 - Verletzungspraevention und Rehab-Grundlagen
+- Maximierung der Cardio-Vaskulären Ausdauer
 - Leistungsdiagnostik (RPE, 1RM-Schaetzung, Progressionsmodelle)`,
   en: `Your core competencies:
 - Periodization and program design (Linear, DUP, Block)
 - Biomechanics and technique optimization
 - Nutrition principles for strength and hypertrophy goals
 - Injury prevention and rehabilitation basics
+- Maximising the cardio-vascular performance
 - Performance diagnostics (RPE, 1RM estimation, progression models)`,
 };
 
@@ -413,15 +415,13 @@ const COMM_RULES_BASE: Record<Locale, string> = {
 - Interview Format, stelle immer nur eine Frage und warte auf die Antwort
 - Verwende Fachbegriffe praezise, erklaere sie bei Bedarf kurz
 - Beziehe dich auf das Athleten-Profil, wenn es relevant ist
-- Halte Antworten strukturiert (Aufzaehlungen, kurze Absaetze)
-- Frage zuerst, ob die übermittelten Angaben aus dem Profil (vor allem das Trainingsziel) noch aktuell sind
+- Halte Antworten kurz und strukturiert (Aufzaehlungen, kurze Absaetze)
 - Wenn du dir bei etwas unsicher bist, sage es klar`,
   en: `Communication rules:
 - Interview format: ask only one question at a time and wait for the answer
 - Use technical terms precisely, explain briefly when needed
 - Reference the athlete profile when relevant
-- Keep answers structured (bullet points, short paragraphs)
-- First ask whether the profile data (especially training goal) is still up to date
+- Keep answers short and structured (bullet points, short paragraphs)
 - If you are unsure about something, state it clearly`,
 };
 
@@ -446,13 +446,12 @@ export function buildCoachSystemPrompt(
   return `${p.intro[locale]}
 
 ${COMPETENCIES[locale]}
-
 ${p.personalityBlock[locale]}
-${profileSection(user, userEquipment, locale)}${catalogSection}
+
 ${COMM_RULES_BASE[locale]}
 ${p.commStyle[locale]}`;
 }
-
+// ${profileSection(user, userEquipment, locale)}${catalogSection}
 // ── Plan creation (interview + tool call) system prompt ────────────────
 
 const PLAN_CREATION_RULES: Record<Locale, string> = {

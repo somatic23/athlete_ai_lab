@@ -234,7 +234,7 @@ function EmptyState({ coachName, onPrompt }: { coachName: string; onPrompt: (tex
   ];
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col items-center justify-center py-16 text-center">
+    <div className="mx-auto flex max-w-4xl flex-col items-center justify-center py-16 text-center">
       <div
         className="relative mb-6 flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl"
         style={{
