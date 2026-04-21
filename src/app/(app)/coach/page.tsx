@@ -94,7 +94,7 @@ export default function CoachPage() {
         {messages.length === 0 ? (
           <EmptyState coachName={coachName} onPrompt={(text) => { sendMessage({ text }); }} />
         ) : (
-          <div className="mx-auto flex max-w-2xl flex-col gap-4">
+          <div className="mx-auto flex max-w-4xl flex-col gap-4">
             {messages.map((msg) => {
               const textContent = msg.parts
                 .filter(isTextUIPart)
