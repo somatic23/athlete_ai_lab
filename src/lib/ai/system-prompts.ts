@@ -434,14 +434,7 @@ export function buildCoachSystemPrompt(
 ): string {
   const p = getPersonality(personality ?? (user?.coachPersonality as CoachPersonality | undefined));
 
-  const exerciseCatalog =
-    userEquipment && allExercises
-      ? buildExerciseCatalog(userEquipment, allExercises, locale)
-      : "";
 
-  const catalogSection = exerciseCatalog
-    ? `\n${CATALOG_HEADER[locale]}\n${exerciseCatalog}\n`
-    : "";
 
   return `${p.intro[locale]}
 
