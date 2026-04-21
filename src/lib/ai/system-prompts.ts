@@ -447,7 +447,7 @@ export function buildCoachSystemPrompt(
 
 ${COMPETENCIES[locale]}
 ${p.personalityBlock[locale]}
-
+${profileSection(user, userEquipment, locale)}
 ${COMM_RULES_BASE[locale]}
 ${p.commStyle[locale]}`;
 }
