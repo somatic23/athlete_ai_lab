@@ -284,6 +284,9 @@ export const workoutSessions = sqliteTable("workout_sessions", {
   totalReps: integer("total_reps"),
   muscleGroupsTrained: text("muscle_groups_trained"), // JSON array
   sessionRpeAvg: real("session_rpe_avg"),
+  aiAnalysisCompleted: integer("ai_analysis_completed", { mode: "boolean" })
+    .notNull()
+    .default(false),
   notes: text("notes"),
   createdAt: text("created_at")
     .notNull()

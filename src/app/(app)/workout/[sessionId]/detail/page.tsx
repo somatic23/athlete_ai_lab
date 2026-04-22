@@ -37,6 +37,7 @@ type Session = {
   satisfactionRating: number | null;
   feedbackText: string | null;
   sessionRpeAvg: number | null;
+  aiAnalysisCompleted: boolean;
   sets: WorkoutSet[];
   aiReport: AiReport | null;
 };
@@ -291,6 +292,7 @@ export default function WorkoutDetailPage({ params }: Params) {
   const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
   const [editMode, setEditMode] = useState(false);
+  const [analyzingAi, setAnalyzingAi] = useState(false);
 
   // Session-level edit state
   const [perceivedLoad, setPerceivedLoad] = useState<string>("");
@@ -330,6 +332,16 @@ export default function WorkoutDetailPage({ params }: Params) {
       ...prev,
       sets: prev.sets.filter((s) => s.id !== setId),
     } : prev);
+  }
+
+  async function handleRunAnalysis() {
+    setAnalyzingAi(true);
+    const res = await fetch(`/api/workout/${sessionId}/analyze`, { method: "POST" });
+    if (res.ok) {
+      const data = await res.json();
+      setSession((prev) => prev ? { ...prev, aiReport: data.aiAnalysis, aiAnalysisCompleted: true } : prev);
+    }
+    setAnalyzingAi(false);
   }
 
   async function handleSaveMeta() {
@@ -545,6 +557,25 @@ export default function WorkoutDetailPage({ params }: Params) {
                   onDelete={handleDeleteSet}
                 />
               ))}
+            </div>
+          )}
+
+          {/* AI Analysis — manual trigger */}
+          {session.completedAt && !session.aiReport && (
+            <div className="rounded-xl bg-surface-container-low p-4 flex flex-col gap-3">
+              <p className="text-xs font-mono uppercase tracking-wider text-on-surface-variant/60 flex items-center gap-2">
+                <span className="text-on-surface-variant/40">◈</span> Atlas-Analyse
+              </p>
+              <p className="text-sm text-on-surface-variant/60">
+                Die KI-Analyse wurde nicht automatisch durchgeführt.
+              </p>
+              <button
+                onClick={handleRunAnalysis}
+                disabled={analyzingAi}
+                className="self-start rounded-xl bg-primary/10 border border-primary/20 px-4 py-2 text-sm font-medium text-primary hover:bg-primary/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {analyzingAi ? "Analyse läuft…" : "Analyse jetzt starten"}
+              </button>
             </div>
           )}
 

@@ -305,6 +305,10 @@ export async function POST(req: NextRequest, { params }: Params) {
         newPrs: JSON.stringify([]),
         createdAt: now,
       });
+
+      await db.update(workoutSessions)
+        .set({ aiAnalysisCompleted: true })
+        .where(eq(workoutSessions.id, sessionId));
     }
   } catch (err) {
     console.error("AI analysis failed:", err);
