@@ -185,7 +185,6 @@ function SetInputForm({
   trackingType,
   suggested,
   prevSet,
-  lastSessionSets,
   onLog,
   isLogging,
 }: {
@@ -193,28 +192,23 @@ function SetInputForm({
   trackingType: "weight_reps" | "duration";
   suggested: { weightKg: number | null; repsMin: number; repsMax: number | null; targetDurationSeconds: number | null };
   prevSet: LoggedSet | null;
-  lastSessionSets: Array<{ setNumber: number; weightKg: number | null; repsCompleted: number | null; durationSeconds: number | null; rpe: number | null }> | null;
   onLog: (data: Omit<LoggedSet, "localId" | "savedId">) => void;
   isLogging: boolean;
 }) {
-  const historicalSet = lastSessionSets?.find((s) => s.setNumber === setNumber) ?? null;
-
   const [weight, setWeight] = useState(
-    String(historicalSet?.weightKg ?? prevSet?.weightKg ?? suggested.weightKg ?? "")
+    String(prevSet?.weightKg ?? suggested.weightKg ?? "")
   );
   const [reps, setReps] = useState(
-    String(historicalSet?.repsCompleted ?? prevSet?.repsCompleted ?? suggested.repsMin ?? "")
+    String(prevSet?.repsCompleted ?? suggested.repsMin ?? "")
   );
   const [durationMin, setDurationMin] = useState(
-    historicalSet?.durationSeconds != null
-      ? String(historicalSet.durationSeconds / 60)
-      : prevSet?.durationSeconds != null
-        ? String(prevSet.durationSeconds / 60)
-        : suggested.targetDurationSeconds != null
-          ? String(suggested.targetDurationSeconds / 60)
-          : ""
+    prevSet?.durationSeconds != null
+      ? String(prevSet.durationSeconds / 60)
+      : suggested.targetDurationSeconds != null
+        ? String(suggested.targetDurationSeconds / 60)
+        : ""
   );
-  const [rpe, setRpe] = useState<number | null>(historicalSet?.rpe ?? prevSet?.rpe ?? null);
+  const [rpe, setRpe] = useState<number | null>(prevSet?.rpe ?? null);
   const [outcome, setOutcome] = useState<SetOutcome>("completed");
   const [notes, setNotes] = useState("");
   const [showNotes, setShowNotes] = useState(false);
@@ -485,6 +479,16 @@ function LoggedSetRow({ set, onRemove }: { set: LoggedSet; onRemove: () => void 
 
 // ── Exercise Card ─────────────────────────────────────────────────────
 
+type LastSet = {
+  setNumber: number;
+  weightKg: number | null;
+  repsCompleted: number | null;
+  durationSeconds: number | null;
+  rpe: number | null;
+  outcome: string;
+  sessionDate: string;
+};
+
 function ExerciseCard({
   exercise,
   exerciseIdx,
@@ -500,6 +504,14 @@ function ExerciseCard({
   const [isLogging, setIsLogging] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [showAltModal, setShowAltModal] = useState(false);
+  const [lastSets, setLastSets] = useState<LastSet[] | null>(null);
+
+  useEffect(() => {
+    setLastSets(null);
+    fetch(`/api/exercises/${exercise.exerciseId}/last-sets`)
+      .then((r) => r.ok ? r.json() : { sets: [] })
+      .then((data) => setLastSets(data.sets ?? []));
+  }, [exercise.exerciseId]);
 
   function handleSelectAlternative(alt: ExerciseAlternative) {
     replaceExercise(exerciseIdx, {
@@ -517,7 +529,6 @@ function ExerciseCard({
       suggestedWeightKg: alt.suggestedWeightKg,
       notes: null,
       loggedSets: [],
-      lastSessionSets: null,
     });
     setShowAltModal(false);
   }
@@ -629,25 +640,47 @@ function ExerciseCard({
             </div>
           )}
 
-          {/* Set input form — wait for last-session data before rendering (useState only initializes once) */}
-          {exercise.lastSessionSets === null ? (
-            <div className="py-3 text-center text-xs text-on-surface-variant/40">Laden…</div>
-          ) : (
-            <SetInputForm
-              setNumber={nextSetNumber}
-              trackingType={exercise.trackingType}
-              suggested={{
-                weightKg: exercise.suggestedWeightKg,
-                repsMin: exercise.repsMin,
-                repsMax: exercise.repsMax,
-                targetDurationSeconds: exercise.targetDurationSeconds,
-              }}
-              prevSet={prevSet}
-              lastSessionSets={exercise.lastSessionSets}
-              onLog={handleLog}
-              isLogging={isLogging}
-            />
+          {/* Last sets history panel */}
+          {lastSets && lastSets.length > 0 && (
+            <div className="mb-3 rounded-xl bg-surface-container/60 px-3 py-2">
+              <p className="text-[10px] font-mono uppercase tracking-wider text-on-surface-variant/50 mb-1.5">Letztes Training</p>
+              <div className="flex flex-col gap-0.5">
+                {lastSets.map((s, i) => (
+                  <div key={i} className="flex items-center gap-2 text-xs font-mono text-on-surface-variant/70">
+                    <span className="shrink-0 text-on-surface-variant/35">
+                      {new Date(s.sessionDate).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" })}
+                    </span>
+                    <span className="shrink-0 text-on-surface-variant/35">S{s.setNumber}</span>
+                    <span className="font-medium text-on-surface/80">
+                      {s.weightKg != null && s.repsCompleted != null
+                        ? `${s.weightKg} kg × ${s.repsCompleted}`
+                        : s.durationSeconds != null
+                          ? `${(s.durationSeconds / 60).toFixed(1)} min`
+                          : "—"}
+                    </span>
+                    {s.rpe != null && (
+                      <span className="text-on-surface-variant/50">RPE {s.rpe}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
+
+          {/* Set input form */}
+          <SetInputForm
+            setNumber={nextSetNumber}
+            trackingType={exercise.trackingType}
+            suggested={{
+              weightKg: exercise.suggestedWeightKg,
+              repsMin: exercise.repsMin,
+              repsMax: exercise.repsMax,
+              targetDurationSeconds: exercise.targetDurationSeconds,
+            }}
+            prevSet={prevSet}
+            onLog={handleLog}
+            isLogging={isLogging}
+          />
 
           {exercise.restSeconds && (
             <p className="mt-2 text-center text-xs text-on-surface-variant/40 font-mono">
@@ -682,7 +715,7 @@ export default function WorkoutPage({ params }: { params: Promise<{ sessionId: s
   const { sessionId } = use(params);
   const router = useRouter();
   const {
-    activeWorkout, startWorkout, clearWorkout, addExercise, replaceExercise,
+    activeWorkout, startWorkout, clearWorkout, addExercise,
     restTimerSeconds, restTimerActive,
     startRestTimer, tickRestTimer, stopRestTimer,
   } = useWorkoutStore();
@@ -730,9 +763,8 @@ export default function WorkoutPage({ params }: { params: Promise<{ sessionId: s
     }
   }
 
-  async function handleAddExercise(ex: ExerciseOption) {
-    const exerciseIdx = activeWorkout?.exercises.length ?? 0;
-    const newExercise: WorkoutExercise = {
+  function handleAddExercise(ex: ExerciseOption) {
+    addExercise({
       planExerciseId: null,
       exerciseId: ex.id,
       name: parseName(ex.nameI18n),
@@ -747,20 +779,8 @@ export default function WorkoutPage({ params }: { params: Promise<{ sessionId: s
       suggestedWeightKg: null,
       notes: null,
       loggedSets: [],
-      lastSessionSets: null,
-    };
-    addExercise(newExercise);
+    });
     setShowPicker(false);
-
-    try {
-      const res = await fetch(`/api/exercises/${ex.id}/last-sets`);
-      const { sets } = res.ok ? await res.json() : { sets: [] };
-      const current = useWorkoutStore.getState().activeWorkout?.exercises[exerciseIdx];
-      if (current) replaceExercise(exerciseIdx, { ...current, lastSessionSets: sets });
-    } catch {
-      const current = useWorkoutStore.getState().activeWorkout?.exercises[exerciseIdx];
-      if (current) replaceExercise(exerciseIdx, { ...current, lastSessionSets: [] });
-    }
   }
 
   async function handleCancel() {

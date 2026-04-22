@@ -7,25 +7,12 @@ import { and, eq, isNotNull, desc, asc } from "drizzle-orm";
 type Params = { params: Promise<{ exerciseId: string }> };
 
 // GET /api/exercises/[exerciseId]/last-sets
+// Returns the last 5 individual sets for this exercise across all completed sessions
 export async function GET(_req: NextRequest, { params }: Params) {
   const session = await auth();
   if (!session?.user?.id) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
   const { exerciseId } = await params;
-
-  const lastSession = await db
-    .select({ sessionId: workoutSets.sessionId })
-    .from(workoutSets)
-    .innerJoin(workoutSessions, eq(workoutSets.sessionId, workoutSessions.id))
-    .where(and(
-      eq(workoutSessions.userId, session.user.id),
-      eq(workoutSets.exerciseId, exerciseId),
-      isNotNull(workoutSessions.completedAt)
-    ))
-    .orderBy(desc(workoutSessions.completedAt))
-    .limit(1);
-
-  if (lastSession.length === 0) return NextResponse.json({ sets: [] });
 
   const sets = await db
     .select({
@@ -35,13 +22,17 @@ export async function GET(_req: NextRequest, { params }: Params) {
       durationSeconds: workoutSets.durationSeconds,
       rpe: workoutSets.rpe,
       outcome: workoutSets.outcome,
+      sessionDate: workoutSessions.startedAt,
     })
     .from(workoutSets)
+    .innerJoin(workoutSessions, eq(workoutSets.sessionId, workoutSessions.id))
     .where(and(
-      eq(workoutSets.sessionId, lastSession[0].sessionId),
-      eq(workoutSets.exerciseId, exerciseId)
+      eq(workoutSessions.userId, session.user.id),
+      eq(workoutSets.exerciseId, exerciseId),
+      isNotNull(workoutSessions.completedAt)
     ))
-    .orderBy(asc(workoutSets.setNumber));
+    .orderBy(desc(workoutSessions.completedAt), asc(workoutSets.setNumber))
+    .limit(5);
 
   return NextResponse.json({ sets });
 }
