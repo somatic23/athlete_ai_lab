@@ -31,6 +31,11 @@ type ScheduledEvent = {
   trainingDayId: string | null; trainingDay: TrainingDay | null;
 };
 
+type CompletedSession = {
+  id: string; title: string; startedAt: string; completedAt: string;
+  durationSeconds: number | null; totalVolumeKg: number | null; totalSets: number | null;
+};
+
 type PlanDay = {
   id: string; title: string; focus: string | null;
   estimatedDurationMin: number | null; sortOrder: number;
@@ -195,6 +200,22 @@ function DraggableChip({ id, data, color, children }: {
   );
 }
 
+// ── Completed free session chip ───────────────────────────────────────
+
+function CompletedSessionChip({ session, onClick }: {
+  session: CompletedSession; onClick: () => void;
+}) {
+  return (
+    <div
+      onClick={(e) => { e.stopPropagation(); onClick(); }}
+      className="flex items-center gap-1 rounded px-1.5 py-0.5 text-xs font-medium truncate max-w-full cursor-pointer bg-emerald-500/15 text-emerald-400 hover:bg-emerald-500/25 transition-colors"
+    >
+      <span className="shrink-0 h-1.5 w-1.5 rounded-full bg-emerald-400" />
+      <span className="truncate">✓ {session.title}</span>
+    </div>
+  );
+}
+
 // ── Draggable event chip (on calendar) ────────────────────────────────
 
 function EventChip({ event, dayColorMap, onSelect }: {
@@ -236,9 +257,10 @@ function EventChip({ event, dayColorMap, onSelect }: {
 
 // ── Droppable calendar cell ────────────────────────────────────────────
 
-function CalendarCell({ date, events, isCurrentMonth, dayColorMap, onSelectEvent }: {
-  date: Date; events: ScheduledEvent[]; isCurrentMonth: boolean;
-  dayColorMap: DayColorMap; onSelectEvent: (e: ScheduledEvent) => void;
+function CalendarCell({ date, events, completedSessions, isCurrentMonth, dayColorMap, onSelectEvent, onSelectSession }: {
+  date: Date; events: ScheduledEvent[]; completedSessions: CompletedSession[];
+  isCurrentMonth: boolean; dayColorMap: DayColorMap;
+  onSelectEvent: (e: ScheduledEvent) => void; onSelectSession: (s: CompletedSession) => void;
 }) {
   const dateStr = toDateStr(date);
   const isToday = dateStr === toDateStr(new Date());
@@ -264,6 +286,9 @@ function CalendarCell({ date, events, isCurrentMonth, dayColorMap, onSelectEvent
       <div className="flex flex-col gap-0.5 min-w-0">
         {events.map((ev) => (
           <EventChip key={ev.id} event={ev} dayColorMap={dayColorMap} onSelect={onSelectEvent} />
+        ))}
+        {completedSessions.map((s) => (
+          <CompletedSessionChip key={s.id} session={s} onClick={() => onSelectSession(s)} />
         ))}
       </div>
     </div>
@@ -427,10 +452,12 @@ function OverlayChip({ data, dayColorMap }: { data: DragData; dayColorMap: DayCo
 // ── Main page ──────────────────────────────────────────────────────────
 
 export default function CalendarPage() {
+  const router = useRouter();
   const [currentMonth, setCurrentMonth] = useState(() => {
     const d = new Date(); d.setDate(1); return d;
   });
   const [events, setEvents] = useState<ScheduledEvent[]>([]);
+  const [completedSessions, setCompletedSessions] = useState<CompletedSession[]>([]);
   const [activePlan, setActivePlan] = useState<Plan | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeDragData, setActiveDragData] = useState<DragData | null>(null);
@@ -456,8 +483,12 @@ export default function CalendarPage() {
   }
 
   const loadEvents = useCallback(async (f: string, t: string) => {
-    const res = await fetch(`/api/scheduled-events?from=${f}&to=${t}`);
-    if (res.ok) setEvents(await res.json());
+    const [evRes, sessRes] = await Promise.all([
+      fetch(`/api/scheduled-events?from=${f}&to=${t}`),
+      fetch(`/api/workout/sessions?from=${f}&to=${t}`),
+    ]);
+    if (evRes.ok) setEvents(await evRes.json());
+    if (sessRes.ok) setCompletedSessions(await sessRes.json());
   }, []);
 
   useEffect(() => {
@@ -530,6 +561,12 @@ export default function CalendarPage() {
 
   const eventsByDate = events.reduce<Record<string, ScheduledEvent[]>>((acc, ev) => {
     (acc[ev.scheduledDate] ??= []).push(ev);
+    return acc;
+  }, {});
+
+  const sessionsByDate = completedSessions.reduce<Record<string, CompletedSession[]>>((acc, s) => {
+    const dateStr = s.startedAt.slice(0, 10);
+    (acc[dateStr] ??= []).push(s);
     return acc;
   }, {});
 
@@ -646,9 +683,11 @@ export default function CalendarPage() {
                     key={ds}
                     date={date}
                     events={eventsByDate[ds] ?? []}
+                    completedSessions={sessionsByDate[ds] ?? []}
                     isCurrentMonth={date.getMonth() === month}
                     dayColorMap={dayColorMap}
                     onSelectEvent={setSelectedEvent}
+                    onSelectSession={(s) => router.push(`/workout/${s.id}/detail`)}
                   />
                 );
               })}

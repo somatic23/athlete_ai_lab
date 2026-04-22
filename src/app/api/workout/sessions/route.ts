@@ -4,7 +4,7 @@ import { db } from "@/db";
 import {
   workoutSessions, trainingDays,
 } from "@/db/schema";
-import { and, eq, desc } from "drizzle-orm";
+import { and, eq, desc, gte, lte, isNull, isNotNull } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { z } from "zod";
 import { parseI18n } from "@/lib/utils/i18n";
@@ -31,6 +31,25 @@ export async function GET(req: NextRequest) {
       ),
     });
     return NextResponse.json(row ?? null);
+  }
+
+  const from = req.nextUrl.searchParams.get("from");
+  const to   = req.nextUrl.searchParams.get("to");
+
+  // Date-range query: return completed free sessions (no scheduledEventId) for calendar display
+  if (from && to) {
+    const conditions = [
+      eq(workoutSessions.userId, session.user.id),
+      isNotNull(workoutSessions.completedAt),
+      isNull(workoutSessions.scheduledEventId),
+      gte(workoutSessions.startedAt, from),
+      lte(workoutSessions.startedAt, to + "T23:59:59.999Z"),
+    ];
+    const rows = await db.query.workoutSessions.findMany({
+      where: and(...conditions),
+      orderBy: [desc(workoutSessions.startedAt)],
+    });
+    return NextResponse.json(rows);
   }
 
   const rows = await db.query.workoutSessions.findMany({

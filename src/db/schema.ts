@@ -460,7 +460,8 @@ export const chatConversations = sqliteTable("chat_conversations", {
   context: text("context"), // 'onboarding', 'plan_creation', 'post_workout', 'general'
   relatedPlanId: text("related_plan_id").references(() => trainingPlans.id),
   relatedSessionId: text("related_session_id").references(
-    () => workoutSessions.id
+    () => workoutSessions.id,
+    { onDelete: "set null" }
   ),
   createdAt: text("created_at")
     .notNull()

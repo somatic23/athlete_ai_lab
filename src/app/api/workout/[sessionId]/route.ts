@@ -1,8 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth/config";
 import { db } from "@/db";
-import { workoutSessions, aiAnalysisReports } from "@/db/schema";
-import { and, eq } from "drizzle-orm";
+import { workoutSessions, workoutSets, personalRecords, aiAnalysisReports, scheduledEvents, chatConversations } from "@/db/schema";
+import { and, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { parseI18n } from "@/lib/utils/i18n";
 
@@ -67,10 +67,46 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
 
   const { sessionId } = await params;
 
+  const row = await db.query.workoutSessions.findFirst({
+    where: and(eq(workoutSessions.id, sessionId), eq(workoutSessions.userId, session.user.id)),
+  });
+
+  if (!row) return NextResponse.json({ ok: true });
+
+  // Null out FKs that have no cascade before deleting
+
+  // chat_conversations.related_session_id → no cascade
+  await db.update(chatConversations)
+    .set({ relatedSessionId: null })
+    .where(eq(chatConversations.relatedSessionId, sessionId));
+
+  // personal_records.workout_set_id → workout_sets → cascade from session
+  // Must null out PRs before sets can be deleted
+  const setIds = (await db
+    .select({ id: workoutSets.id })
+    .from(workoutSets)
+    .where(eq(workoutSets.sessionId, sessionId))
+  ).map((s) => s.id);
+
+  if (setIds.length > 0) {
+    await db.update(personalRecords)
+      .set({ workoutSetId: null })
+      .where(inArray(personalRecords.workoutSetId, setIds));
+  }
+
   await db.delete(workoutSessions).where(and(
     eq(workoutSessions.id, sessionId),
     eq(workoutSessions.userId, session.user.id)
   ));
+
+  if (row?.scheduledEventId) {
+    await db.update(scheduledEvents)
+      .set({ isCompleted: false, updatedAt: new Date().toISOString() })
+      .where(and(
+        eq(scheduledEvents.id, row.scheduledEventId),
+        eq(scheduledEvents.userId, session.user.id)
+      ));
+  }
 
   return NextResponse.json({ ok: true });
 }
