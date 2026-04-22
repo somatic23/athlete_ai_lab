@@ -185,6 +185,7 @@ function SetInputForm({
   trackingType,
   suggested,
   prevSet,
+  lastSessionSets,
   onLog,
   isLogging,
 }: {
@@ -192,23 +193,28 @@ function SetInputForm({
   trackingType: "weight_reps" | "duration";
   suggested: { weightKg: number | null; repsMin: number; repsMax: number | null; targetDurationSeconds: number | null };
   prevSet: LoggedSet | null;
+  lastSessionSets: Array<{ setNumber: number; weightKg: number | null; repsCompleted: number | null; durationSeconds: number | null; rpe: number | null }> | null;
   onLog: (data: Omit<LoggedSet, "localId" | "savedId">) => void;
   isLogging: boolean;
 }) {
+  const historicalSet = lastSessionSets?.find((s) => s.setNumber === setNumber) ?? null;
+
   const [weight, setWeight] = useState(
-    String(prevSet?.weightKg ?? suggested.weightKg ?? "")
+    String(historicalSet?.weightKg ?? prevSet?.weightKg ?? suggested.weightKg ?? "")
   );
   const [reps, setReps] = useState(
-    String(prevSet?.repsCompleted ?? suggested.repsMin ?? "")
+    String(historicalSet?.repsCompleted ?? prevSet?.repsCompleted ?? suggested.repsMin ?? "")
   );
   const [durationMin, setDurationMin] = useState(
-    prevSet?.durationSeconds != null
-      ? String(prevSet.durationSeconds / 60)
-      : suggested.targetDurationSeconds != null
-        ? String(suggested.targetDurationSeconds / 60)
-        : ""
+    historicalSet?.durationSeconds != null
+      ? String(historicalSet.durationSeconds / 60)
+      : prevSet?.durationSeconds != null
+        ? String(prevSet.durationSeconds / 60)
+        : suggested.targetDurationSeconds != null
+          ? String(suggested.targetDurationSeconds / 60)
+          : ""
   );
-  const [rpe, setRpe] = useState<number | null>(prevSet?.rpe ?? null);
+  const [rpe, setRpe] = useState<number | null>(historicalSet?.rpe ?? prevSet?.rpe ?? null);
   const [outcome, setOutcome] = useState<SetOutcome>("completed");
   const [notes, setNotes] = useState("");
   const [showNotes, setShowNotes] = useState(false);
@@ -511,6 +517,7 @@ function ExerciseCard({
       suggestedWeightKg: alt.suggestedWeightKg,
       notes: null,
       loggedSets: [],
+      lastSessionSets: null,
     });
     setShowAltModal(false);
   }
@@ -622,20 +629,25 @@ function ExerciseCard({
             </div>
           )}
 
-          {/* Set input form — always show next set */}
-          <SetInputForm
-            setNumber={nextSetNumber}
-            trackingType={exercise.trackingType}
-            suggested={{
-              weightKg: exercise.suggestedWeightKg,
-              repsMin: exercise.repsMin,
-              repsMax: exercise.repsMax,
-              targetDurationSeconds: exercise.targetDurationSeconds,
-            }}
-            prevSet={prevSet}
-            onLog={handleLog}
-            isLogging={isLogging}
-          />
+          {/* Set input form — wait for last-session data before rendering (useState only initializes once) */}
+          {exercise.lastSessionSets === null ? (
+            <div className="py-3 text-center text-xs text-on-surface-variant/40">Laden…</div>
+          ) : (
+            <SetInputForm
+              setNumber={nextSetNumber}
+              trackingType={exercise.trackingType}
+              suggested={{
+                weightKg: exercise.suggestedWeightKg,
+                repsMin: exercise.repsMin,
+                repsMax: exercise.repsMax,
+                targetDurationSeconds: exercise.targetDurationSeconds,
+              }}
+              prevSet={prevSet}
+              lastSessionSets={exercise.lastSessionSets}
+              onLog={handleLog}
+              isLogging={isLogging}
+            />
+          )}
 
           {exercise.restSeconds && (
             <p className="mt-2 text-center text-xs text-on-surface-variant/40 font-mono">
@@ -670,7 +682,7 @@ export default function WorkoutPage({ params }: { params: Promise<{ sessionId: s
   const { sessionId } = use(params);
   const router = useRouter();
   const {
-    activeWorkout, startWorkout, clearWorkout, addExercise,
+    activeWorkout, startWorkout, clearWorkout, addExercise, replaceExercise,
     restTimerSeconds, restTimerActive,
     startRestTimer, tickRestTimer, stopRestTimer,
   } = useWorkoutStore();
@@ -718,8 +730,9 @@ export default function WorkoutPage({ params }: { params: Promise<{ sessionId: s
     }
   }
 
-  function handleAddExercise(ex: ExerciseOption) {
-    addExercise({
+  async function handleAddExercise(ex: ExerciseOption) {
+    const exerciseIdx = activeWorkout?.exercises.length ?? 0;
+    const newExercise: WorkoutExercise = {
       planExerciseId: null,
       exerciseId: ex.id,
       name: parseName(ex.nameI18n),
@@ -734,8 +747,20 @@ export default function WorkoutPage({ params }: { params: Promise<{ sessionId: s
       suggestedWeightKg: null,
       notes: null,
       loggedSets: [],
-    });
+      lastSessionSets: null,
+    };
+    addExercise(newExercise);
     setShowPicker(false);
+
+    try {
+      const res = await fetch(`/api/exercises/${ex.id}/last-sets`);
+      const { sets } = res.ok ? await res.json() : { sets: [] };
+      const current = useWorkoutStore.getState().activeWorkout?.exercises[exerciseIdx];
+      if (current) replaceExercise(exerciseIdx, { ...current, lastSessionSets: sets });
+    } catch {
+      const current = useWorkoutStore.getState().activeWorkout?.exercises[exerciseIdx];
+      if (current) replaceExercise(exerciseIdx, { ...current, lastSessionSets: [] });
+    }
   }
 
   async function handleCancel() {

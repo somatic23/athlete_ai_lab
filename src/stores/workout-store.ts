@@ -32,6 +32,13 @@ export type WorkoutExercise = {
   suggestedWeightKg: number | null;
   notes: string | null;
   loggedSets: LoggedSet[];
+  lastSessionSets: Array<{
+    setNumber: number;
+    weightKg: number | null;
+    repsCompleted: number | null;
+    durationSeconds: number | null;
+    rpe: number | null;
+  }> | null;
 };
 
 export type ActiveWorkout = {
