@@ -180,11 +180,14 @@ function RestTimerBar({ seconds, total, onSkip }: { seconds: number; total: numb
 
 // ── Set Input Form ────────────────────────────────────────────────────
 
+type SetPrefill = { weightKg: number | null; repsCompleted: number | null; durationSeconds: number | null; rpe: number | null };
+
 function SetInputForm({
   setNumber,
   trackingType,
   suggested,
   prevSet,
+  prefill,
   onLog,
   isLogging,
 }: {
@@ -192,6 +195,7 @@ function SetInputForm({
   trackingType: "weight_reps" | "duration";
   suggested: { weightKg: number | null; repsMin: number; repsMax: number | null; targetDurationSeconds: number | null };
   prevSet: LoggedSet | null;
+  prefill: SetPrefill | null;
   onLog: (data: Omit<LoggedSet, "localId" | "savedId">) => void;
   isLogging: boolean;
 }) {
@@ -209,6 +213,14 @@ function SetInputForm({
         : ""
   );
   const [rpe, setRpe] = useState<number | null>(prevSet?.rpe ?? null);
+
+  useEffect(() => {
+    if (!prefill) return;
+    if (prefill.weightKg != null) setWeight(String(prefill.weightKg));
+    if (prefill.repsCompleted != null) setReps(String(prefill.repsCompleted));
+    if (prefill.durationSeconds != null) setDurationMin(String(prefill.durationSeconds / 60));
+    setRpe(prefill.rpe);
+  }, [prefill]);
   const [outcome, setOutcome] = useState<SetOutcome>("completed");
   const [notes, setNotes] = useState("");
   const [showNotes, setShowNotes] = useState(false);
@@ -429,8 +441,142 @@ function SetInputForm({
 
 // ── Logged Set Row ────────────────────────────────────────────────────
 
-function LoggedSetRow({ set, onRemove }: { set: LoggedSet; onRemove: () => void }) {
-  const outcome = OUTCOMES.find((o) => o.value === set.outcome);
+function LoggedSetRow({
+  set,
+  sessionId,
+  exerciseIdx,
+  trackingType,
+  onRemove,
+  onUpdate,
+}: {
+  set: LoggedSet;
+  sessionId: string;
+  exerciseIdx: number;
+  trackingType: "weight_reps" | "duration";
+  onRemove: () => void;
+  onUpdate: (localId: string, patch: Partial<LoggedSet>) => void;
+}) {
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [weight, setWeight] = useState(String(set.weightKg ?? ""));
+  const [reps, setReps] = useState(String(set.repsCompleted ?? ""));
+  const [durationMin, setDurationMin] = useState(
+    set.durationSeconds != null ? String(set.durationSeconds / 60) : ""
+  );
+  const [rpe, setRpe] = useState<number | null>(set.rpe ?? null);
+  const [outcome, setOutcome] = useState<SetOutcome>(set.outcome);
+
+  const outcome_ = OUTCOMES.find((o) => o.value === set.outcome);
+
+  async function handleSave() {
+    setSaving(true);
+    const patch: Partial<LoggedSet> = {
+      outcome,
+      rpe,
+      weightKg: trackingType === "weight_reps" ? (parseFloat(weight) || null) : set.weightKg,
+      repsCompleted: trackingType === "weight_reps" ? (parseInt(reps) || null) : set.repsCompleted,
+      durationSeconds: trackingType === "duration" ? (durationMin ? Math.round(parseFloat(durationMin) * 60) : null) : set.durationSeconds,
+    };
+
+    if (set.savedId) {
+      try {
+        await fetch(`/api/workout/${sessionId}/sets/${set.savedId}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            weightKg: patch.weightKg,
+            repsCompleted: patch.repsCompleted,
+            rpe: patch.rpe,
+            outcome: patch.outcome,
+          }),
+        });
+      } catch { /* ignore */ }
+    }
+
+    onUpdate(set.localId, patch);
+    setEditing(false);
+    setSaving(false);
+  }
+
+  if (editing) {
+    return (
+      <div className="py-3 border-b border-outline-variant/10 last:border-b-0 flex flex-col gap-3">
+        <div className="flex items-center gap-2">
+          <span className="w-5 text-center text-xs font-mono text-on-surface-variant/40 shrink-0">{set.setNumber}</span>
+          <span className="text-xs font-mono text-on-surface-variant/60">Satz {set.setNumber} bearbeiten</span>
+          <button onClick={() => setEditing(false)} className="ml-auto text-xs text-on-surface-variant/40 hover:text-on-surface transition-colors">Abbrechen</button>
+        </div>
+
+        {trackingType === "duration" ? (
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-mono text-on-surface-variant/60 w-20 shrink-0">Dauer (min)</label>
+            <input
+              type="number" inputMode="decimal" step="0.5"
+              value={durationMin}
+              onChange={(e) => setDurationMin(e.target.value)}
+              className="flex-1 rounded-lg bg-surface-container-high px-3 py-1.5 text-sm text-on-surface text-center focus:outline-none focus:ring-1 focus:ring-primary/40 no-spinner"
+            />
+          </div>
+        ) : (
+          <div className="flex items-center gap-2">
+            <label className="text-xs font-mono text-on-surface-variant/60 w-20 shrink-0">Gewicht (kg)</label>
+            <input
+              type="number" inputMode="decimal" step="0.5"
+              value={weight}
+              onChange={(e) => setWeight(e.target.value)}
+              className="flex-1 rounded-lg bg-surface-container-high px-3 py-1.5 text-sm text-on-surface text-center focus:outline-none focus:ring-1 focus:ring-primary/40 no-spinner"
+            />
+            <span className="text-on-surface-variant/40 text-sm shrink-0">×</span>
+            <input
+              type="number" inputMode="numeric" step="1"
+              value={reps}
+              onChange={(e) => setReps(e.target.value)}
+              className="w-16 rounded-lg bg-surface-container-high px-3 py-1.5 text-sm text-on-surface text-center focus:outline-none focus:ring-1 focus:ring-primary/40 no-spinner"
+            />
+          </div>
+        )}
+
+        <div className="flex gap-1.5 flex-wrap">
+          {OUTCOMES.map((o) => (
+            <button
+              key={o.value}
+              onClick={() => setOutcome(o.value)}
+              className={cn(
+                "flex-1 rounded-lg py-1 text-xs font-medium border transition-all",
+                outcome === o.value ? o.color : "bg-transparent text-on-surface-variant/50 border-outline-variant/20"
+              )}
+            >
+              {o.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex gap-1 flex-wrap">
+          {RPE_OPTIONS.map((r) => (
+            <button
+              key={r}
+              onClick={() => setRpe(rpe === r ? null : r)}
+              className={cn(
+                "flex-1 min-w-[2rem] rounded-lg py-1 text-xs font-mono transition-all",
+                rpe === r ? "bg-primary/20 text-primary" : "bg-surface-container-high text-on-surface-variant/50"
+              )}
+            >
+              {r}
+            </button>
+          ))}
+        </div>
+
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="w-full rounded-lg bg-primary/20 text-primary py-2 text-sm font-bold hover:bg-primary/30 transition-all disabled:opacity-50"
+        >
+          {saving ? "Speichern…" : "Speichern"}
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="flex items-center gap-3 py-2.5 border-b border-outline-variant/10 last:border-b-0">
       <span className="w-5 text-center text-xs font-mono text-on-surface-variant/40 shrink-0">
@@ -464,9 +610,16 @@ function LoggedSetRow({ set, onRemove }: { set: LoggedSet; onRemove: () => void 
           <span className="text-xs font-bold text-primary bg-primary/10 rounded px-1.5 py-0.5">PR ✦</span>
         )}
       </div>
-      <span className={cn("text-xs font-medium px-2 py-0.5 rounded-lg border shrink-0", outcome?.color)}>
-        {outcome?.label.slice(0, 5)}
+      <span className={cn("text-xs font-medium px-2 py-0.5 rounded-lg border shrink-0", outcome_?.color)}>
+        {outcome_?.label.slice(0, 5)}
       </span>
+      <button
+        onClick={() => setEditing(true)}
+        className="text-xs text-on-surface-variant/30 hover:text-primary transition-colors shrink-0 px-1"
+        title="Satz bearbeiten"
+      >
+        ✎
+      </button>
       <button
         onClick={onRemove}
         className="text-xs text-on-surface-variant/20 hover:text-error transition-colors shrink-0"
@@ -500,11 +653,14 @@ function ExerciseCard({
   sessionId: string;
   onSetLogged: (exerciseIdx: number, restSeconds: number | null, set: LoggedSet) => void;
 }) {
-  const { addLoggedSet, removeLoggedSet, updateLoggedSet, replaceExercise } = useWorkoutStore();
+  const { addLoggedSet, removeLoggedSet, updateLoggedSet, replaceExercise, removeExercise } = useWorkoutStore();
   const [isLogging, setIsLogging] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
   const [showAltModal, setShowAltModal] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [lastSets, setLastSets] = useState<LastSet[] | null>(null);
+  const [prefill, setPrefill] = useState<SetPrefill | null>(null);
 
   useEffect(() => {
     setLastSets(null);
@@ -512,6 +668,17 @@ function ExerciseCard({
       .then((r) => r.ok ? r.json() : { sets: [] })
       .then((data) => setLastSets(data.sets ?? []));
   }, [exercise.exerciseId]);
+
+  async function handleDeleteExercise() {
+    setDeleting(true);
+    const savedIds = exercise.loggedSets.map((s) => s.savedId).filter(Boolean) as string[];
+    await Promise.all(
+      savedIds.map((id) =>
+        fetch(`/api/workout/${sessionId}/sets/${id}`, { method: "DELETE" }).catch(() => {})
+      )
+    );
+    removeExercise(exerciseIdx);
+  }
 
   function handleSelectAlternative(alt: ExerciseAlternative) {
     replaceExercise(exerciseIdx, {
@@ -610,6 +777,13 @@ function ExerciseCard({
           >
             ⇄
           </button>
+          <button
+            onClick={() => setConfirmDelete(true)}
+            className="text-xs font-mono text-on-surface-variant/30 hover:text-error transition-colors px-1.5 py-0.5 rounded hover:bg-error/10"
+            title="Übung entfernen"
+          >
+            ✕
+          </button>
           <span
             className={cn(
               "text-xs font-mono font-bold px-2 py-0.5 rounded-full cursor-pointer",
@@ -634,53 +808,66 @@ function ExerciseCard({
                 <LoggedSetRow
                   key={set.localId}
                   set={set}
+                  sessionId={sessionId}
+                  exerciseIdx={exerciseIdx}
+                  trackingType={exercise.trackingType}
                   onRemove={() => removeLoggedSet(exerciseIdx, set.localId)}
+                  onUpdate={(localId, patch) => updateLoggedSet(exerciseIdx, localId, patch)}
                 />
               ))}
             </div>
           )}
 
-          {/* Last sets history panel */}
-          {lastSets && lastSets.length > 0 && (
-            <div className="mb-3 rounded-xl bg-surface-container/60 px-3 py-2">
-              <p className="text-[10px] font-mono uppercase tracking-wider text-on-surface-variant/50 mb-1.5">Letztes Training</p>
-              <div className="flex flex-col gap-0.5">
-                {lastSets.map((s, i) => (
-                  <div key={i} className="flex items-center gap-2 text-xs font-mono text-on-surface-variant/70">
-                    <span className="shrink-0 text-on-surface-variant/35">
-                      {new Date(s.sessionDate).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" })}
-                    </span>
-                    <span className="shrink-0 text-on-surface-variant/35">S{s.setNumber}</span>
-                    <span className="font-medium text-on-surface/80">
-                      {s.weightKg != null && s.repsCompleted != null
-                        ? `${s.weightKg} kg × ${s.repsCompleted}`
-                        : s.durationSeconds != null
-                          ? `${(s.durationSeconds / 60).toFixed(1)} min`
-                          : "—"}
-                    </span>
-                    {s.rpe != null && (
-                      <span className="text-on-surface-variant/50">RPE {s.rpe}</span>
-                    )}
-                  </div>
-                ))}
-              </div>
+          {/* Set input form + last sets side by side */}
+          <div className="flex gap-3 items-start">
+            <div className="flex-1 min-w-0">
+              <SetInputForm
+                setNumber={nextSetNumber}
+                trackingType={exercise.trackingType}
+                suggested={{
+                  weightKg: exercise.suggestedWeightKg,
+                  repsMin: exercise.repsMin,
+                  repsMax: exercise.repsMax,
+                  targetDurationSeconds: exercise.targetDurationSeconds,
+                }}
+                prevSet={prevSet}
+                prefill={prefill}
+                onLog={handleLog}
+                isLogging={isLogging}
+              />
             </div>
-          )}
 
-          {/* Set input form */}
-          <SetInputForm
-            setNumber={nextSetNumber}
-            trackingType={exercise.trackingType}
-            suggested={{
-              weightKg: exercise.suggestedWeightKg,
-              repsMin: exercise.repsMin,
-              repsMax: exercise.repsMax,
-              targetDurationSeconds: exercise.targetDurationSeconds,
-            }}
-            prevSet={prevSet}
-            onLog={handleLog}
-            isLogging={isLogging}
-          />
+            {/* Last sets history panel */}
+            {lastSets && lastSets.length > 0 && (
+              <div className="w-[150px] shrink-0 rounded-xl bg-surface-container/60 px-2.5 py-2 mt-3">
+                <p className="text-[9px] font-mono uppercase tracking-wider text-on-surface-variant/40 mb-1.5">Letzte 5 Sets</p>
+                <div className="flex flex-col gap-1">
+                  {lastSets.map((s, i) => (
+                    <button
+                      key={i}
+                      onClick={() => setPrefill({ weightKg: s.weightKg, repsCompleted: s.repsCompleted, durationSeconds: s.durationSeconds, rpe: s.rpe })}
+                      className="flex flex-col gap-0.5 text-left rounded-lg px-1.5 py-1 -mx-1.5 hover:bg-primary/10 active:bg-primary/20 transition-colors w-full"
+                      title="Werte übernehmen"
+                    >
+                      <span className="text-[9px] font-mono text-on-surface-variant/35">
+                        S{s.setNumber} · {new Date(s.sessionDate).toLocaleDateString("de-DE", { day: "2-digit", month: "2-digit" })}
+                      </span>
+                      <span className="text-xs font-mono font-medium text-on-surface/75">
+                        {s.weightKg != null && s.repsCompleted != null
+                          ? `${s.weightKg}×${s.repsCompleted}`
+                          : s.durationSeconds != null
+                            ? `${(s.durationSeconds / 60).toFixed(1)}min`
+                            : "—"}
+                      </span>
+                      {s.rpe != null && (
+                        <span className="text-[9px] font-mono text-on-surface-variant/40">RPE {s.rpe}</span>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
 
           {exercise.restSeconds && (
             <p className="mt-2 text-center text-xs text-on-surface-variant/40 font-mono">
@@ -690,6 +877,40 @@ function ExerciseCard({
           {exercise.notes && (
             <p className="mt-1 text-xs text-on-surface-variant/50 italic">{exercise.notes}</p>
           )}
+        </div>
+      )}
+      {confirmDelete && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-6 bg-surface/70 backdrop-blur-sm"
+          onClick={() => setConfirmDelete(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl bg-surface-container-high p-6 flex flex-col gap-4 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div>
+              <h2 className="font-headline font-bold text-on-surface mb-1">Übung entfernen?</h2>
+              <p className="text-sm text-on-surface-variant">
+                <span className="font-medium text-on-surface">{exercise.name}</span> wird aus diesem Training entfernt.
+                {exercise.loggedSets.length > 0 && ` ${exercise.loggedSets.length} bereits geloggte Sätze werden ebenfalls gelöscht.`}
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setConfirmDelete(false)}
+                className="flex-1 rounded-xl bg-surface-container text-on-surface-variant py-3 text-sm font-medium hover:bg-surface-container-high transition-all"
+              >
+                Abbrechen
+              </button>
+              <button
+                onClick={handleDeleteExercise}
+                disabled={deleting}
+                className="flex-1 rounded-xl bg-error text-white py-3 text-sm font-bold hover:opacity-90 transition-all disabled:opacity-50"
+              >
+                {deleting ? "Löschen…" : "Entfernen"}
+              </button>
+            </div>
+          </div>
         </div>
       )}
       {showAltModal && (

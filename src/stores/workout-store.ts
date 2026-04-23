@@ -50,6 +50,7 @@ type WorkoutStore = {
 
   startWorkout: (workout: ActiveWorkout) => void;
   addExercise: (exercise: WorkoutExercise) => void;
+  removeExercise: (exerciseIdx: number) => void;
   replaceExercise: (exerciseIdx: number, exercise: WorkoutExercise) => void;
   addLoggedSet: (exerciseIdx: number, set: LoggedSet) => void;
   updateLoggedSet: (exerciseIdx: number, setLocalId: string, patch: Partial<LoggedSet>) => void;
@@ -79,6 +80,13 @@ export const useWorkoutStore = create<WorkoutStore>()(
               exercises: [...state.activeWorkout.exercises, exercise],
             },
           };
+        }),
+
+      removeExercise: (exerciseIdx) =>
+        set((state) => {
+          if (!state.activeWorkout) return state;
+          const exercises = state.activeWorkout.exercises.filter((_, i) => i !== exerciseIdx);
+          return { activeWorkout: { ...state.activeWorkout, exercises } };
         }),
 
       replaceExercise: (exerciseIdx, exercise) =>
