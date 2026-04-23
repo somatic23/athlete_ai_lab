@@ -85,10 +85,10 @@ function StreakWidget({ streak }: { streak: number }) {
       </div>
       <div className="mt-1 flex items-baseline gap-1.5">
         <span className="display-text text-2xl font-bold text-on-surface">{streak}</span>
-        <span className="mono-text text-[10px] text-on-surface-variant/60">days</span>
+        <span className="mono-text text-[10px] text-on-surface-variant/60">Wochen</span>
       </div>
       <div className="mt-2 flex gap-0.5">
-        {Array.from({ length: 14 }).map((_, i) => (
+        {Array.from({ length: 8 }).map((_, i) => (
           <span
             key={i}
             className="flex-1 h-1.5 rounded-[2px]"

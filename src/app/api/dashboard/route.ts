@@ -30,6 +30,7 @@ export async function GET() {
   const today = now.toISOString().slice(0, 10);
   const cutoff30 = new Date(Date.now() - 30 * 86_400_000).toISOString();
   const cutoff30Date = cutoff30.slice(0, 10);
+  const cutoff52w = new Date(Date.now() - 364 * 86_400_000).toISOString();
 
   // Current week Mon–Sun for 7-day schedule strip
   const weekDay = now.getDay(); // 0=Sun
@@ -43,7 +44,7 @@ export async function GET() {
   const weekStartStr = weekStart.toISOString().slice(0, 10);
   const weekEndStr = weekEnd.toISOString().slice(0, 10);
 
-  const [userRow, activePlanRow, nextEventRow, loadRows, lastReportRow, recentSessionRows, weekEventRows] =
+  const [userRow, activePlanRow, nextEventRow, loadRows, lastReportRow, recentSessionRows, weekEventRows, streakSessionRows] =
     await Promise.all([
       // 1. User display name + locale
       db.query.users.findFirst({
@@ -120,6 +121,11 @@ export async function GET() {
         },
         orderBy: (e, { asc }) => [asc(e.scheduledDate)],
       }),
+
+      // 8. Streak sessions: last 52 weeks, only completedAt needed
+      db.select({ completedAt: workoutSessions.completedAt })
+        .from(workoutSessions)
+        .where(and(eq(workoutSessions.userId, userId), gte(workoutSessions.completedAt, cutoff52w))),
     ]);
 
   const locale = (userRow?.preferredLocale ?? "de") as "de" | "en";
@@ -293,12 +299,22 @@ export async function GET() {
     return entry;
   });
 
-  // Training streak: consecutive non-rest days going backward from today
+  // Training streak: consecutive weeks with at least one session, going backward from current week
   const trainingStreak = (() => {
+    const weekMonday = (iso: string) => {
+      const d = new Date(iso.slice(0, 10) + "T00:00:00Z");
+      const day = d.getUTCDay();
+      d.setUTCDate(d.getUTCDate() + (day === 0 ? -6 : 1 - day));
+      return d.toISOString().slice(0, 10);
+    };
+    const trainingWeeks = new Set(
+      streakSessionRows.filter((r) => r.completedAt).map((r) => weekMonday(r.completedAt!))
+    );
     let n = 0;
-    for (let i = trainingLoad.length - 1; i >= 0; i--) {
-      if (trainingLoad[i].volumeKg > 0) n++;
-      else break;
+    const cursor = new Date(weekMonday(today) + "T00:00:00Z");
+    while (trainingWeeks.has(cursor.toISOString().slice(0, 10))) {
+      n++;
+      cursor.setUTCDate(cursor.getUTCDate() - 7);
     }
     return n;
   })();

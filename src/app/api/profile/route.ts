@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth/config";
 import { db } from "@/db";
 import { users, userEquipment, equipment, workoutSessions } from "@/db/schema";
-import { eq, and, gte, desc } from "drizzle-orm";
+import { eq, and, gte } from "drizzle-orm";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 
@@ -55,24 +55,29 @@ export async function GET() {
     .innerJoin(equipment, eq(userEquipment.equipmentId, equipment.id))
     .where(eq(userEquipment.userId, session.user.id));
 
-  // Training streak: consecutive days with completed sessions going backward
-  const cutoff30 = new Date(Date.now() - 30 * 86_400_000).toISOString();
+  // Training streak: consecutive weeks with at least one session, going backward from current week
+  const cutoff52w = new Date(Date.now() - 364 * 86_400_000).toISOString();
   const recentSessions = await db
     .select({ completedAt: workoutSessions.completedAt })
     .from(workoutSessions)
-    .where(and(eq(workoutSessions.userId, session.user.id), gte(workoutSessions.completedAt, cutoff30)))
-    .orderBy(desc(workoutSessions.completedAt));
+    .where(and(eq(workoutSessions.userId, session.user.id), gte(workoutSessions.completedAt, cutoff52w)));
 
   const trainingStreak = (() => {
-    const sessionDates = new Set(recentSessions.map((s) => s.completedAt?.slice(0, 10)).filter(Boolean));
+    const weekMonday = (iso: string) => {
+      const d = new Date(iso.slice(0, 10) + "T00:00:00Z");
+      const day = d.getUTCDay();
+      d.setUTCDate(d.getUTCDate() + (day === 0 ? -6 : 1 - day));
+      return d.toISOString().slice(0, 10);
+    };
+    const today = new Date().toISOString().slice(0, 10);
+    const trainingWeeks = new Set(
+      recentSessions.filter((s) => s.completedAt).map((s) => weekMonday(s.completedAt!))
+    );
     let n = 0;
-    const now = new Date();
-    for (let i = 0; i < 30; i++) {
-      const d = new Date(now);
-      d.setDate(now.getDate() - i);
-      const dateStr = d.toISOString().slice(0, 10);
-      if (sessionDates.has(dateStr)) n++;
-      else if (i > 0) break; // allow today to be empty (in-progress day)
+    const cursor = new Date(weekMonday(today) + "T00:00:00Z");
+    while (trainingWeeks.has(cursor.toISOString().slice(0, 10))) {
+      n++;
+      cursor.setUTCDate(cursor.getUTCDate() - 7);
     }
     return n;
   })();
