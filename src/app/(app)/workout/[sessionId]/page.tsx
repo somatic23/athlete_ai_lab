@@ -840,7 +840,7 @@ function ExerciseCard({
             {/* Last sets history panel */}
             {lastSets && lastSets.length > 0 && (
               <div className="w-[150px] shrink-0 rounded-xl bg-surface-container/60 px-2.5 py-2 mt-3">
-                <p className="text-[9px] font-mono uppercase tracking-wider text-on-surface-variant/40 mb-1.5">Letzte 5 Sets</p>
+                <p className="text-[9px] font-mono uppercase tracking-wider text-on-surface-variant/40 mb-1.5">Letztes Workout</p>
                 <div className="flex flex-col gap-1">
                   {lastSets.map((s, i) => (
                     <button
