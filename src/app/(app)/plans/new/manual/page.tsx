@@ -79,6 +79,8 @@ function emptyExRow(ex: CatalogExercise): PlanExRow {
 
 // ── Exercise picker ────────────────────────────────────────────────────
 
+const MUSCLE_GROUPS = Object.entries(MUSCLE_LABELS);
+
 function ExercisePicker({
   catalog,
   onAdd,
@@ -89,10 +91,12 @@ function ExercisePicker({
   onClose: () => void;
 }) {
   const [search, setSearch] = useState("");
+  const [muscleFilter, setMuscleFilter] = useState<string | null>(null);
 
   const filtered = catalog.filter((ex) => {
+    if (muscleFilter && ex.primaryMuscleGroup !== muscleFilter) return false;
+    if (!search) return true;
     const q = search.toLowerCase();
-    if (!q) return true;
     const name = parseName(ex.nameI18n).toLowerCase();
     const muscle = (MUSCLE_LABELS[ex.primaryMuscleGroup] ?? ex.primaryMuscleGroup).toLowerCase();
     return name.includes(q) || muscle.includes(q);
@@ -115,6 +119,36 @@ function ExercisePicker({
           ✕
         </button>
       </div>
+
+      {/* Muscle group chips */}
+      <div className="flex gap-1.5 overflow-x-auto no-scrollbar">
+        <button
+          onClick={() => setMuscleFilter(null)}
+          className={cn(
+            "shrink-0 rounded-full px-3 py-1 text-xs font-medium border transition-all min-w-[4rem] text-center",
+            muscleFilter === null
+              ? "bg-primary/20 text-primary border-primary/30"
+              : "bg-transparent text-on-surface-variant/60 border-outline-variant/20 hover:border-outline-variant"
+          )}
+        >
+          Alle
+        </button>
+        {MUSCLE_GROUPS.map(([key, label]) => (
+          <button
+            key={key}
+            onClick={() => setMuscleFilter(muscleFilter === key ? null : key)}
+            className={cn(
+              "shrink-0 rounded-full px-3 py-1 text-xs font-medium border transition-all",
+              muscleFilter === key
+                ? "bg-primary/20 text-primary border-primary/30"
+                : "bg-transparent text-on-surface-variant/60 border-outline-variant/20 hover:border-outline-variant"
+            )}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+
       <div className="max-h-52 overflow-y-auto flex flex-col gap-0.5">
         {filtered.length === 0 ? (
           <p className="text-xs text-on-surface-variant py-2 text-center">Keine Übungen gefunden</p>

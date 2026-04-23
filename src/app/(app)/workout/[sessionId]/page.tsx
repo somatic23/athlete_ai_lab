@@ -33,6 +33,8 @@ function parseName(nameI18n: string): string {
 
 // ── Exercise Picker Modal ─────────────────────────────────────────────
 
+const MUSCLE_GROUPS = Object.entries(MUSCLE_LABELS);
+
 function ExercisePicker({
   onAdd,
   onClose,
@@ -42,6 +44,7 @@ function ExercisePicker({
 }) {
   const [exercises, setExercises] = useState<ExerciseOption[]>([]);
   const [query, setQuery] = useState("");
+  const [muscleFilter, setMuscleFilter] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -52,6 +55,8 @@ function ExercisePicker({
   }, []);
 
   const filtered = exercises.filter((ex) => {
+    if (muscleFilter && ex.primaryMuscleGroup !== muscleFilter) return false;
+    if (!query) return true;
     const name = parseName(ex.nameI18n).toLowerCase();
     const muscle = (MUSCLE_LABELS[ex.primaryMuscleGroup] ?? "").toLowerCase();
     const q = query.toLowerCase();
@@ -74,15 +79,46 @@ function ExercisePicker({
         </div>
 
         {/* Search */}
-        <div className="px-4 py-3">
+        <div className="px-4 pt-3 pb-2">
           <input
             type="text"
             autoFocus
-            placeholder="Suche nach Name oder Muskelgruppe…"
+            placeholder="Suche nach Name…"
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             className="w-full rounded-xl bg-surface-container px-4 py-2.5 text-sm text-on-surface placeholder:text-on-surface-variant/40 focus:outline-none focus:ring-1 focus:ring-primary/40"
           />
+        </div>
+
+        {/* Muscle group chips */}
+        <div className="shrink-0 overflow-x-auto no-scrollbar">
+          <div className="flex gap-1.5 px-4 py-2">
+            <button
+              onClick={() => setMuscleFilter(null)}
+              className={cn(
+                "shrink-0 rounded-full px-3 py-1.5 text-xs font-medium border transition-all min-w-[4rem] text-center",
+                muscleFilter === null
+                  ? "bg-primary/20 text-primary border-primary/30"
+                  : "bg-transparent text-on-surface-variant/60 border-outline-variant/20 hover:border-outline-variant"
+              )}
+            >
+              Alle
+            </button>
+            {MUSCLE_GROUPS.map(([key, label]) => (
+              <button
+                key={key}
+                onClick={() => setMuscleFilter(muscleFilter === key ? null : key)}
+                className={cn(
+                  "shrink-0 rounded-full px-3 py-1.5 text-xs font-medium border transition-all",
+                  muscleFilter === key
+                    ? "bg-primary/20 text-primary border-primary/30"
+                    : "bg-transparent text-on-surface-variant/60 border-outline-variant/20 hover:border-outline-variant"
+                )}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
         </div>
 
         {/* List */}
