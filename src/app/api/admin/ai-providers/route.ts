@@ -27,6 +27,9 @@ async function requireAdmin() {
 }
 
 export async function GET() {
+  if (!(await requireAdmin()))
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
   const items = await db.query.aiProviders.findMany({
     orderBy: (p, { asc }) => [asc(p.displayName)],
   });

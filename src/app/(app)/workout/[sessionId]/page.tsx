@@ -1031,7 +1031,7 @@ export default function WorkoutPage({ params }: { params: Promise<{ sessionId: s
       osc.frequency.value = s === 1 ? 1320 : 880;
       osc.type = "sine";
       const start = ctx.currentTime + i * 0.25;
-      const dur = s === 1 ? 0.3 : 0.15;
+      const dur = s === 1 ? 0.8 : 0.5;
       gain.gain.setValueAtTime(0.4, start);
       gain.gain.exponentialRampToValueAtTime(0.001, start + dur);
       osc.start(start);

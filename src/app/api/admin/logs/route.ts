@@ -29,7 +29,9 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  // Internal logging endpoint - no admin required (app can log events)
+  if (!(await requireAdmin()))
+    return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+
   const body = await req.json();
   const { level = "info", message, metadata, userId } = body;
 
