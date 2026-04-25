@@ -64,6 +64,9 @@ export async function DELETE(
       .all()
       .map((r) => r.id);
 
+    // 3. Personal records reference workout_sets — must go before workout_sets
+    tx.delete(personalRecords).where(eq(personalRecords.userId, targetId)).run();
+
     if (sessionIds.length > 0) {
       tx.delete(workoutSets).where(inArray(workoutSets.sessionId, sessionIds)).run();
       tx.delete(workoutExerciseSummary)
@@ -71,14 +74,11 @@ export async function DELETE(
         .run();
     }
 
-    // 3. AI analysis reports reference both user and session
+    // 4. AI analysis reports reference both user and session
     tx.delete(aiAnalysisReports).where(eq(aiAnalysisReports.userId, targetId)).run();
 
-    // 4. Workout sessions (now safe — sets/summaries already gone)
+    // 5. Workout sessions (now safe — sets/summaries already gone)
     tx.delete(workoutSessions).where(eq(workoutSessions.userId, targetId)).run();
-
-    // 5. Personal records
-    tx.delete(personalRecords).where(eq(personalRecords.userId, targetId)).run();
 
     // 6. Chat messages → conversations
     const convIds = tx
