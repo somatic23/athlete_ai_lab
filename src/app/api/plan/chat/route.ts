@@ -84,6 +84,10 @@ export async function POST(req: Request) {
     maxOutputTokens: 4096,
 
     onFinish: async ({ text, usage, finishReason, warnings }) => {
+      await logger.debug("plan.chat.raw_response", {
+        userId,
+        metadata: { provider: activeProvider?.provider ?? "unknown", model: activeProvider?.modelId ?? "unknown", rawText: text },
+      });
       await logger.info("plan.chat.response", {
         userId,
         metadata: {

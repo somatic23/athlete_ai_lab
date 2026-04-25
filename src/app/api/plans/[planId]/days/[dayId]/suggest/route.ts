@@ -178,6 +178,10 @@ export async function POST(_req: NextRequest, { params }: Params) {
 
   try {
     result = await generateObject({ model, schema: coachingSuggestionAiSchema, system: systemPrompt, prompt: userPrompt });
+    await logger.debug("ai:coaching_suggestion:raw_response", {
+      userId: session.user.id,
+      metadata: { dayId, response: result.object },
+    });
   } catch (genObjErr) {
     await logger.warn("ai:coaching_suggestion:generateObject_failed", {
       userId: session.user.id,
@@ -186,9 +190,9 @@ export async function POST(_req: NextRequest, { params }: Params) {
     try {
       const textResult = await generateText({ model, system: systemPrompt, prompt: userPrompt });
       const rawText = textResult.text;
-      await logger.info("ai:coaching_suggestion:generateText_raw", {
+      await logger.debug("ai:coaching_suggestion:raw_response", {
         userId: session.user.id,
-        metadata: { dayId, rawText: rawText.slice(0, 2000) },
+        metadata: { dayId, rawText },
       });
       const jsonObj = extractJsonObject(rawText);
       if (jsonObj) {

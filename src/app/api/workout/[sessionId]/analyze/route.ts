@@ -143,6 +143,10 @@ export async function POST(_req: NextRequest, { params }: Params) {
     let result: { object: Analysis } | null = null;
     try {
       result = await generateObject({ model, schema: analysisSchema, system: systemPrompt, prompt: userPrompt });
+      await logger.debug("ai_analysis:manual:raw_response", {
+        userId: session.user.id,
+        metadata: { sessionId, response: result.object },
+      });
     } catch (genObjErr) {
       await logger.warn("ai_analysis:manual:generateObject_failed", {
         userId: session.user.id,
@@ -150,6 +154,10 @@ export async function POST(_req: NextRequest, { params }: Params) {
       });
       try {
         const textResult = await generateText({ model, system: systemPrompt, prompt: userPrompt });
+        await logger.debug("ai_analysis:manual:raw_response", {
+          userId: session.user.id,
+          metadata: { sessionId, rawText: textResult.text },
+        });
         const jsonObj = extractJsonObject(textResult.text);
         if (jsonObj) {
           const lenient = z.object({

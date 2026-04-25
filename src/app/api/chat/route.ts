@@ -88,6 +88,10 @@ export async function POST(req: Request) {
 
     onFinish: async ({ text, usage, finishReason, warnings }) => {
       const durationMs = Date.now() - requestedAt;
+      await logger.debug("chat.raw_response", {
+        userId,
+        metadata: { provider: activeProvider?.provider ?? "unknown", model: activeProvider?.modelId ?? "unknown", rawText: text },
+      });
       await logger.info("chat.response", {
         userId,
         metadata: {

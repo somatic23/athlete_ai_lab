@@ -167,6 +167,10 @@ ${schemaExample}`;
   try {
     const r = await generateObject({ model, schema: responseSchema, system: systemPrompt, prompt: userPrompt });
     result = r.object;
+    await logger.debug("ai:exercise_alternatives:raw_response", {
+      userId: session.user.id,
+      metadata: { exerciseId, response: result },
+    });
   } catch (genObjErr) {
     await logger.warn("ai:exercise_alternatives:generateObject_failed", {
       userId: session.user.id,
@@ -174,6 +178,10 @@ ${schemaExample}`;
     });
     try {
       const textResult = await generateText({ model, system: systemPrompt, prompt: userPrompt });
+      await logger.debug("ai:exercise_alternatives:raw_response", {
+        userId: session.user.id,
+        metadata: { exerciseId, rawText: textResult.text },
+      });
       const jsonObj = extractJsonObject(textResult.text);
       if (jsonObj) {
         const p = lenientResponseSchema.safeParse(jsonObj);

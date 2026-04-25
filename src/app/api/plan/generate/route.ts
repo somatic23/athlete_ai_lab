@@ -102,6 +102,11 @@ export async function POST(req: Request) {
       ? await generateObject({ model, schema: generatedPlanSchema, system: systemForGenerate, messages: messagesForGenerate! })
       : await generateObject({ model, schema: generatedPlanSchema, prompt: promptForGenerate! });
 
+    await logger.debug("plan.generate.raw_response", {
+      userId,
+      metadata: { attempt: 1, response: object },
+    });
+
     await logger.info("plan.generate.success", {
       userId,
       metadata: {
@@ -140,6 +145,11 @@ export async function POST(req: Request) {
     const { text } = isChatMode
       ? await generateText({ model, maxOutputTokens: 4096, system: systemForGenerate, messages: retryMessages! })
       : await generateText({ model, maxOutputTokens: 4096, prompt: `${promptForGenerate}\n\n${retryInstruction}` });
+
+    await logger.debug("plan.generate.raw_response", {
+      userId,
+      metadata: { attempt: 2, rawText: text },
+    });
 
     const extracted = extractJson(text);
     const parsed = JSON.parse(extracted);

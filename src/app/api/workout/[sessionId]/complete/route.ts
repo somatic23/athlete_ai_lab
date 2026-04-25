@@ -240,6 +240,10 @@ export async function POST(req: NextRequest, { params }: Params) {
     let result: { object: Analysis } | null = null;
     try {
       result = await generateObject({ model, schema: analysisSchema, system: systemPrompt, prompt: userPrompt });
+      await logger.debug("ai_analysis:post_workout:raw_response", {
+        userId: session.user.id,
+        metadata: { sessionId, response: result.object },
+      });
     } catch (genObjErr) {
       await logger.warn("ai_analysis:post_workout:generateObject_failed", {
         userId: session.user.id,
@@ -248,9 +252,9 @@ export async function POST(req: NextRequest, { params }: Params) {
       try {
         const textResult = await generateText({ model, system: systemPrompt, prompt: userPrompt });
         const rawText = textResult.text;
-        await logger.info("ai_analysis:post_workout:generateText_raw", {
+        await logger.debug("ai_analysis:post_workout:raw_response", {
           userId: session.user.id,
-          metadata: { sessionId, rawText: rawText.slice(0, 2000) },
+          metadata: { sessionId, rawText },
         });
         const jsonObj = extractJsonObject(rawText);
         if (jsonObj) {
