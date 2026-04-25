@@ -1011,6 +1011,35 @@ export default function WorkoutPage({ params }: { params: Promise<{ sessionId: s
     return () => clearInterval(id);
   }, [restTimerActive, tickRestTimer]);
 
+  // Rest timer beeps
+  useEffect(() => {
+    if (!restTimerActive) return;
+    const s = restTimerSeconds;
+    let count = 0;
+    if (s === 30) count = 1;
+    else if (s === 20) count = 2;
+    else if (s === 10) count = 3;
+    else if (s === 3 || s === 2 || s === 1) count = 1;
+    if (count === 0) return;
+
+    const ctx = new AudioContext();
+    for (let i = 0; i < count; i++) {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.frequency.value = s === 1 ? 1320 : 880;
+      osc.type = "sine";
+      const start = ctx.currentTime + i * 0.25;
+      const dur = s === 1 ? 0.3 : 0.15;
+      gain.gain.setValueAtTime(0.4, start);
+      gain.gain.exponentialRampToValueAtTime(0.001, start + dur);
+      osc.start(start);
+      osc.stop(start + dur);
+    }
+    setTimeout(() => ctx.close(), count * 250 + 300);
+  }, [restTimerSeconds, restTimerActive]);
+
   const { elapsed, label: stopwatchLabel } = useStopwatch(activeWorkout?.startedAt ?? null);
 
   function handleSetLogged(_exerciseIdx: number, restSeconds: number | null, _set: LoggedSet) {
