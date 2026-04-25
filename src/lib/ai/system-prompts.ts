@@ -211,11 +211,11 @@ export function buildAnalysisSystemPrompt(locale: Locale = "de"): string {
   if (locale === "en") {
     return `You are Atlas, a science-based strength training coach.
 Analyze the workout session and provide structured feedback in English. Be precise and actionable.
-Respond ONLY with a JSON object.`;
+You MUST respond with a valid JSON object only. No markdown, no code fences, no explanation text — raw JSON only.`;
   }
   return `Du bist Atlas, ein wissenschaftlich fundierter Krafttraining-Coach.
 Analysiere die Trainingseinheit und liefere strukturiertes Feedback auf Deutsch. Sei präzise und umsetzbar.
-Antworte NUR mit einem JSON-Objekt.`;
+Du MUSST mit einem validen JSON-Objekt antworten. Kein Markdown, keine Code-Blöcke, kein Erklärungstext — nur reines JSON.`;
 }
 
 export function buildAnalysisUserPrompt(
@@ -232,6 +232,18 @@ export function buildAnalysisUserPrompt(
   exerciseContext: string,
   locale: Locale = "de"
 ): string {
+  const JSON_SCHEMA_EN = `
+Output ONLY the following JSON object — no explanation, no markdown, no preamble:
+{
+  "highlights": ["positive observations about the session"],
+  "warnings": ["concerns or risk factors"],
+  "recommendations": ["concrete actionable suggestions"],
+  "plateauDetectedExercises": ["exercise names where progress has stalled"],
+  "overloadDetectedMuscles": ["muscle groups showing overload signs"],
+  "recoveryEstimates": { "muscle_group": 48 },
+  "nextSessionSuggestions": ["suggestions for the next workout"]
+}`;
+
   if (locale === "en") {
     return `WORKOUT: ${title}
 Duration: ${Math.round(durationSeconds / 60)} min | Volume: ${totalVolumeKg.toFixed(1)} kg | Sets: ${totalSets} | Reps: ${totalReps}
@@ -244,14 +256,25 @@ Muscle groups: ${muscleGroupsTrained.join(", ")}
 
 Exercises:
 ${exerciseContext}
-
-Generate an analysis with highlights, warnings, recommendations, plateauDetectedExercises, overloadDetectedMuscles, recoveryEstimates (muscle→hours), nextSessionSuggestions.`;
+${JSON_SCHEMA_EN}`;
   }
 
   const LOAD_LABELS_DE: Record<string, string> = {
     light: "leicht", moderate: "moderat", heavy: "schwer",
     very_heavy: "sehr schwer", maximal: "maximal",
   };
+
+  const JSON_SCHEMA_DE = `
+Gib NUR das folgende JSON-Objekt aus — keine Erklärung, kein Markdown, keine Einleitung:
+{
+  "highlights": ["positive Beobachtungen zur Einheit"],
+  "warnings": ["Bedenken oder Risikofaktoren"],
+  "recommendations": ["konkrete umsetzbare Empfehlungen"],
+  "plateauDetectedExercises": ["Übungsnamen, bei denen der Fortschritt stagniert"],
+  "overloadDetectedMuscles": ["Muskelgruppen mit Überlastungsanzeichen"],
+  "recoveryEstimates": { "muskelgruppe": 48 },
+  "nextSessionSuggestions": ["Vorschläge für das nächste Training"]
+}`;
 
   return `TRAINING: ${title}
 Dauer: ${Math.round(durationSeconds / 60)} min | Volumen: ${totalVolumeKg.toFixed(1)} kg | Sätze: ${totalSets} | Wdh: ${totalReps}
@@ -264,8 +287,7 @@ Muskelgruppen: ${muscleGroupsTrained.join(", ")}
 
 Übungen:
 ${exerciseContext}
-
-Erstelle eine Analyse mit highlights, warnings, recommendations, plateauDetectedExercises, overloadDetectedMuscles, recoveryEstimates (Muskel→Stunden), nextSessionSuggestions.`;
+${JSON_SCHEMA_DE}`;
 }
 
 // ── Weekly / Monthly analysis prompts ────────────────────────────────

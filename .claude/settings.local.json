@@ -10,7 +10,8 @@
       "Bash(npx create-next-app@latest temp-next-init --typescript --tailwind --eslint --app --src-dir --import-alias \"@/*\" --turbopack --yes)",
       "Bash(npx tsc:*)",
       "Bash(node:*)",
-      "Bash(git *)"
+      "Bash(git *)",
+      "Bash(xargs grep *)"
     ]
   }
 }
