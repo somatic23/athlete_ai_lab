@@ -218,6 +218,79 @@ Analysiere die Trainingseinheit und liefere strukturiertes Feedback auf Deutsch.
 Du MUSST mit einem validen JSON-Objekt antworten. Kein Markdown, keine Code-Blöcke, kein Erklärungstext — nur reines JSON.`;
 }
 
+export type ExerciseSetDetail = {
+  setNumber: number;
+  weightKg: number | null;
+  repsCompleted: number | null;
+  rpe: number | null;
+  outcome: "completed" | "failure" | "partial" | "skipped";
+  notes: string | null;
+};
+
+export type ExerciseSessionHistory = {
+  date: string;
+  totalVolumeKg: number;
+  maxWeightKg: number;
+  totalReps: number;
+  setCount: number;
+  estimated1rm: number | null;
+};
+
+export type ExerciseAnalysisData = {
+  name: string;
+  muscleGroup: string;
+  currentSets: ExerciseSetDetail[];
+  totalVolume: number;
+  maxWeight: number;
+  avgRpe: number | null;
+  best1rm: number | null;
+  history: ExerciseSessionHistory[];
+};
+
+const OUTCOME_SYMBOL: Record<string, string> = {
+  completed: "✓", partial: "~", failure: "✗", skipped: "—",
+};
+
+function formatExerciseBlock(ex: ExerciseAnalysisData, locale: Locale): string {
+  const lines: string[] = [];
+  const setLabel = locale === "de" ? "Satz" : "Set";
+  const wdhLabel = locale === "de" ? "Wdh" : "reps";
+  const volLabel = locale === "de" ? "Volumen" : "Volume";
+  const maxLabel = locale === "de" ? "Max" : "Max";
+  const histLabel = locale === "de" ? "Verlauf (letzte Einheiten)" : "History (last sessions)";
+  const noHistLabel = locale === "de" ? "keine Vorhistorie vorhanden" : "no prior history";
+
+  lines.push(`${ex.name} [${ex.muscleGroup}]`);
+
+  for (const s of ex.currentSets) {
+    const sym = OUTCOME_SYMBOL[s.outcome] ?? "?";
+    const weight = s.weightKg != null ? `${s.weightKg} kg` : "—";
+    const reps = s.repsCompleted != null ? `${s.repsCompleted} ${wdhLabel}` : "—";
+    const rpe = s.rpe != null ? ` | RPE ${s.rpe.toFixed(1)}` : "";
+    const note = s.notes ? ` | "${s.notes}"` : "";
+    lines.push(`  ${setLabel} ${s.setNumber}: ${weight} × ${reps}${rpe} | ${sym}${note}`);
+  }
+
+  const summaryParts: string[] = [`${volLabel}: ${ex.totalVolume.toFixed(1)} kg`, `${maxLabel}: ${ex.maxWeight} kg`];
+  if (ex.avgRpe != null) summaryParts.push(`⌀ RPE ${ex.avgRpe.toFixed(1)}`);
+  if (ex.best1rm) summaryParts.push(`Est. 1RM: ${ex.best1rm.toFixed(1)} kg`);
+  lines.push(`  → ${summaryParts.join(" | ")}`);
+
+  if (ex.history.length > 0) {
+    lines.push(`  ${histLabel}:`);
+    for (const h of ex.history) {
+      const date = h.date.slice(0, 10);
+      const parts = [`${h.setCount} Sätze`, `Max ${h.maxWeightKg} kg`, `${h.totalReps} ${wdhLabel}`, `${h.totalVolumeKg.toFixed(0)} kg ${volLabel}`];
+      if (h.estimated1rm) parts.push(`Est. 1RM: ${h.estimated1rm.toFixed(1)} kg`);
+      lines.push(`    ${date}: ${parts.join(" | ")}`);
+    }
+  } else {
+    lines.push(`  (${noHistLabel})`);
+  }
+
+  return lines.join("\n");
+}
+
 export function buildAnalysisUserPrompt(
   title: string,
   durationSeconds: number,
@@ -229,9 +302,11 @@ export function buildAnalysisUserPrompt(
   satisfactionRating: number | null | undefined,
   feedbackText: string | null | undefined,
   muscleGroupsTrained: string[],
-  exerciseContext: string,
+  exercises: ExerciseAnalysisData[],
   locale: Locale = "de"
 ): string {
+  const exerciseBlocks = exercises.map((e) => formatExerciseBlock(e, locale)).join("\n\n");
+
   const JSON_SCHEMA_EN = `
 Output ONLY the following JSON object — no explanation, no markdown, no preamble:
 {
@@ -254,8 +329,9 @@ ${feedbackText ? `Feedback: ${feedbackText}` : ""}
 
 Muscle groups: ${muscleGroupsTrained.join(", ")}
 
-Exercises:
-${exerciseContext}
+── CURRENT SESSION (individual sets + history) ──
+
+${exerciseBlocks}
 ${JSON_SCHEMA_EN}`;
   }
 
@@ -285,8 +361,9 @@ ${feedbackText ? `Feedback: ${feedbackText}` : ""}
 
 Muskelgruppen: ${muscleGroupsTrained.join(", ")}
 
-Übungen:
-${exerciseContext}
+── AKTUELLE EINHEIT (einzelne Sätze + Verlauf) ──
+
+${exerciseBlocks}
 ${JSON_SCHEMA_DE}`;
 }
 

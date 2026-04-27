@@ -5,13 +5,13 @@ import {
   users, workoutSessions, workoutSets, workoutExerciseSummary,
   muscleGroupLoadLog, aiAnalysisReports, scheduledEvents,
 } from "@/db/schema";
-import { and, eq } from "drizzle-orm";
+import { and, eq, ne, inArray, desc, isNotNull } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { z } from "zod";
 import { estimated1rm } from "@/lib/utils/1rm";
 import { parseI18n } from "@/lib/utils/i18n";
 import { getDefaultModel } from "@/lib/ai/provider-registry";
-import { buildAnalysisSystemPrompt, buildAnalysisUserPrompt } from "@/lib/ai/system-prompts";
+import { buildAnalysisSystemPrompt, buildAnalysisUserPrompt, type ExerciseAnalysisData, type ExerciseSessionHistory } from "@/lib/ai/system-prompts";
 import { generateObject, generateText } from "ai";
 import { logger } from "@/lib/utils/logger";
 import { extractJsonObject } from "@/lib/utils/extract-json";
@@ -208,13 +208,91 @@ export async function POST(req: NextRequest, { params }: Params) {
   try {
     const model = await getDefaultModel();
 
-    const exerciseContext = exerciseSummaries.map((e) => {
-      let line = `- ${e.name}: ${e.totalReps} Wdh, ${e.totalVolume.toFixed(1)} kg Volumen`;
-      if (e.maxWeight) line += `, max ${e.maxWeight} kg`;
-      if (e.avgRpe != null) line += `, ⌀ RPE ${e.avgRpe.toFixed(1)}`;
-      if (e.best1rm) line += `, est. 1RM ${e.best1rm} kg`;
-      return line;
-    }).join("\n");
+    // ── Fetch historical sets for progression context ────────────────
+    const HISTORY_LIMIT = 5;
+    const exerciseIds = exerciseSummaries.map((e) => e.exerciseId);
+
+    type HistRow = {
+      sessionId: string; exerciseId: string;
+      weightKg: number | null; repsCompleted: number | null;
+      rpe: number | null; outcome: string; sessionDate: string;
+    };
+
+    let historicalRows: HistRow[] = [];
+    if (exerciseIds.length > 0) {
+      historicalRows = await db
+        .select({
+          sessionId: workoutSets.sessionId,
+          exerciseId: workoutSets.exerciseId,
+          weightKg: workoutSets.weightKg,
+          repsCompleted: workoutSets.repsCompleted,
+          rpe: workoutSets.rpe,
+          outcome: workoutSets.outcome,
+          sessionDate: workoutSessions.startedAt,
+        })
+        .from(workoutSets)
+        .innerJoin(workoutSessions, eq(workoutSets.sessionId, workoutSessions.id))
+        .where(
+          and(
+            inArray(workoutSets.exerciseId, exerciseIds),
+            ne(workoutSets.sessionId, sessionId),
+            eq(workoutSessions.userId, session.user.id),
+            isNotNull(workoutSessions.completedAt)
+          )
+        )
+        .orderBy(desc(workoutSessions.startedAt));
+    }
+
+    const historyMap = new Map<string, Map<string, HistRow[]>>();
+    for (const row of historicalRows) {
+      if (!historyMap.has(row.exerciseId)) historyMap.set(row.exerciseId, new Map());
+      const bySession = historyMap.get(row.exerciseId)!;
+      if (!bySession.has(row.sessionId)) {
+        if (bySession.size >= HISTORY_LIMIT) continue;
+        bySession.set(row.sessionId, []);
+      }
+      bySession.get(row.sessionId)!.push(row);
+    }
+
+    const exerciseAnalysisData: ExerciseAnalysisData[] = exerciseSummaries.map((e) => {
+      const history: ExerciseSessionHistory[] = [];
+      const bySession = historyMap.get(e.exerciseId);
+      if (bySession) {
+        for (const [, sessionRows] of bySession) {
+          const completedRows = sessionRows.filter((r) => r.outcome !== "skipped");
+          const hVol = completedRows.reduce((acc, r) => acc + (r.weightKg ?? 0) * (r.repsCompleted ?? 0), 0);
+          const hMax = completedRows.reduce((max, r) => Math.max(max, r.weightKg ?? 0), 0);
+          const hReps = completedRows.reduce((acc, r) => acc + (r.repsCompleted ?? 0), 0);
+          let hEst1rm: number | null = null;
+          for (const r of completedRows) {
+            if (r.weightKg && r.repsCompleted) {
+              const est = estimated1rm(r.weightKg, r.repsCompleted);
+              if (hEst1rm == null || est > hEst1rm) hEst1rm = est;
+            }
+          }
+          history.push({ date: sessionRows[0].sessionDate, totalVolumeKg: hVol, maxWeightKg: hMax, totalReps: hReps, setCount: completedRows.length, estimated1rm: hEst1rm });
+        }
+      }
+
+      const exSets = sets.filter((s) => s.exerciseId === e.exerciseId);
+      return {
+        name: e.name,
+        muscleGroup: e.primaryMuscle,
+        currentSets: exSets.map((s) => ({
+          setNumber: s.setNumber,
+          weightKg: s.weightKg,
+          repsCompleted: s.repsCompleted,
+          rpe: s.rpe,
+          outcome: s.outcome as ExerciseAnalysisData["currentSets"][number]["outcome"],
+          notes: s.notes,
+        })),
+        totalVolume: e.totalVolume,
+        maxWeight: e.maxWeight,
+        avgRpe: e.avgRpe,
+        best1rm: e.best1rm,
+        history,
+      };
+    });
 
     const systemPrompt = buildAnalysisSystemPrompt(locale);
     const userPrompt = buildAnalysisUserPrompt(
@@ -228,7 +306,7 @@ export async function POST(req: NextRequest, { params }: Params) {
       satisfactionRating,
       feedbackText,
       muscleGroupsTrained,
-      exerciseContext,
+      exerciseAnalysisData,
       locale
     );
 
