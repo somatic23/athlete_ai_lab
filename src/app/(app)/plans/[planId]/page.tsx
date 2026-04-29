@@ -480,7 +480,14 @@ function SuggestionCard({ dayId, planId, currentExercises, suggestion, onAccepte
     <div className="mt-3 rounded-xl border border-secondary/20 bg-secondary/5 overflow-hidden">
       <div className="px-4 py-3 border-b border-secondary/10">
         <div className="flex items-center justify-between gap-2">
-          <span className="text-xs font-mono font-bold text-secondary">✦ KI-Coaching-Vorschlag</span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-mono font-bold text-secondary">✦ KI-Coaching-Vorschlag</span>
+            {suggestion.source === "auto" && (
+              <span className="rounded-full border border-secondary/30 bg-secondary/10 px-2 py-0.5 text-[10px] font-mono uppercase tracking-wide text-secondary">
+                Auto nach Workout
+              </span>
+            )}
+          </div>
           <span className="text-xs font-mono text-on-surface-variant/50">
             {new Date(suggestion.generatedAt).toLocaleString("de-DE", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
           </span>

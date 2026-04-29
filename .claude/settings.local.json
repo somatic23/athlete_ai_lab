@@ -11,7 +11,8 @@
       "Bash(npx tsc:*)",
       "Bash(node:*)",
       "Bash(git *)",
-      "Bash(xargs grep *)"
+      "Bash(xargs grep *)",
+      "Bash(grep -E \"\\\\.\\(ts|js\\)$\")"
     ]
   }
 }

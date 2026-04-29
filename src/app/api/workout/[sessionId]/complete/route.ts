@@ -3,9 +3,13 @@ import { auth } from "@/lib/auth/config";
 import { db } from "@/db";
 import {
   users, workoutSessions, workoutSets, workoutExerciseSummary,
-  muscleGroupLoadLog, aiAnalysisReports, scheduledEvents,
+  muscleGroupLoadLog, aiAnalysisReports, scheduledEvents, personalRecords,
+  trainingDays,
 } from "@/db/schema";
-import { and, eq, ne, inArray, desc, isNotNull } from "drizzle-orm";
+import { detectPrs, type DetectedPr } from "@/lib/coaching/pr-detection";
+import { upsertWeeklySnapshot, weekStartOf } from "@/lib/coaching/snapshots";
+import { generateSuggestionForDay } from "@/lib/coaching/generate-suggestion";
+import { and, eq, ne, gte, inArray, desc, isNotNull } from "drizzle-orm";
 import { randomUUID } from "crypto";
 import { z } from "zod";
 import { estimated1rm } from "@/lib/utils/1rm";
@@ -121,10 +125,28 @@ export async function POST(req: NextRequest, { params }: Params) {
     let best1rm: number | null = null;
     for (const s of doneSets) {
       if (s.weightKg && s.repsCompleted) {
-        const e = estimated1rm(s.weightKg, s.repsCompleted);
+        const e = estimated1rm(s.weightKg, s.repsCompleted, s.rpe);
         if (best1rm == null || e > best1rm) best1rm = e;
       }
     }
+
+    const prev = await db
+      .select({ estimated1rm: workoutExerciseSummary.estimated1rm })
+      .from(workoutExerciseSummary)
+      .innerJoin(workoutSessions, eq(workoutExerciseSummary.sessionId, workoutSessions.id))
+      .where(and(
+        eq(workoutSessions.userId, session.user.id),
+        eq(workoutExerciseSummary.exerciseId, ex.exerciseId),
+        isNotNull(workoutSessions.completedAt),
+        ne(workoutSessions.id, sessionId),
+      ))
+      .orderBy(desc(workoutSessions.startedAt))
+      .limit(1);
+
+    const previousE1rm = prev[0]?.estimated1rm ?? null;
+    const deltaPct = (previousE1rm && best1rm)
+      ? ((best1rm - previousE1rm) / previousE1rm) * 100
+      : null;
 
     totalVolumeKg += volume;
     totalSets += doneSets.length;
@@ -146,8 +168,8 @@ export async function POST(req: NextRequest, { params }: Params) {
       totalReps: repCount || null,
       avgRpe,
       estimated1rm: best1rm,
-      previousEstimated1rm: null,
-      performanceDeltaPct: null,
+      previousEstimated1rm: previousE1rm,
+      performanceDeltaPct: deltaPct,
       createdAt: now,
     });
   }
@@ -156,6 +178,55 @@ export async function POST(req: NextRequest, { params }: Params) {
     ? rpeValues.reduce((a, b) => a + b, 0) / rpeValues.length
     : null;
   const muscleGroupsTrained = Array.from(muscleGroupsSet);
+
+  // ── Weekly progression snapshots ───────────────────────────────────
+  try {
+    const week = weekStartOf(now);
+    for (const ex of exerciseSummaries) {
+      await upsertWeeklySnapshot(db, session.user.id, ex.exerciseId, week);
+    }
+    await logger.info("progression:snapshot:upsert", {
+      userId: session.user.id,
+      metadata: { sessionId, week, count: exerciseSummaries.length },
+    });
+  } catch (err) {
+    await logger.warn("progression:snapshot:failed", {
+      userId: session.user.id,
+      metadata: { sessionId, error: String(err) },
+    });
+  }
+
+  // ── Personal records ───────────────────────────────────────────────
+  let detectedPrs: DetectedPr[] = [];
+  try {
+    detectedPrs = await detectPrs(db, session.user.id, exerciseSummaries, sets);
+    for (const pr of detectedPrs) {
+      await db.insert(personalRecords).values({
+        id: randomUUID(),
+        userId: session.user.id,
+        exerciseId: pr.exerciseId,
+        recordType: pr.recordType,
+        weightKg: pr.weightKg,
+        reps: pr.reps,
+        estimated1rm: pr.estimated1rm,
+        previousRecordValue: pr.previousValue,
+        achievedAt: now,
+        workoutSetId: pr.workoutSetId,
+        createdAt: now,
+      });
+    }
+    if (detectedPrs.length > 0) {
+      await logger.info("progression:pr:detected", {
+        userId: session.user.id,
+        metadata: { sessionId, count: detectedPrs.length, prs: detectedPrs },
+      });
+    }
+  } catch (err) {
+    await logger.warn("progression:pr:failed", {
+      userId: session.user.id,
+      metadata: { sessionId, error: String(err) },
+    });
+  }
 
   // ── Muscle group load log ──────────────────────────────────────────
   for (const muscle of muscleGroupsTrained) {
@@ -266,7 +337,7 @@ export async function POST(req: NextRequest, { params }: Params) {
           let hEst1rm: number | null = null;
           for (const r of completedRows) {
             if (r.weightKg && r.repsCompleted) {
-              const est = estimated1rm(r.weightKg, r.repsCompleted);
+              const est = estimated1rm(r.weightKg, r.repsCompleted, r.rpe);
               if (hEst1rm == null || est > hEst1rm) hEst1rm = est;
             }
           }
@@ -384,7 +455,12 @@ export async function POST(req: NextRequest, { params }: Params) {
         recommendations: JSON.stringify(aiAnalysis.recommendations),
         plateauDetectedExercises: JSON.stringify(aiAnalysis.plateauDetectedExercises),
         overloadDetectedMuscles: JSON.stringify(aiAnalysis.overloadDetectedMuscles),
-        newPrs: JSON.stringify([]),
+        newPrs: JSON.stringify(detectedPrs.map((p) => ({
+          exerciseId: p.exerciseId,
+          recordType: p.recordType,
+          weightKg: p.weightKg,
+          reps: p.reps,
+        }))),
         createdAt: now,
       });
 
@@ -395,6 +471,55 @@ export async function POST(req: NextRequest, { params }: Params) {
   } catch (err) {
     console.error("AI analysis failed:", err);
     await logger.error("ai_analysis:post_workout:failed", {
+      userId: session.user.id,
+      metadata: { sessionId, error: String(err) },
+    });
+  }
+
+  // ── Auto-trigger suggestion for next planned occurrence ────────────
+  try {
+    if (workoutSession.trainingDayId) {
+      const todayDate = todayStr;
+
+      // 1. Try the next future scheduled occurrence of this trainingDay
+      const nextScheduled = await db
+        .select({ trainingDayId: scheduledEvents.trainingDayId })
+        .from(scheduledEvents)
+        .where(and(
+          eq(scheduledEvents.userId, session.user.id),
+          eq(scheduledEvents.trainingDayId, workoutSession.trainingDayId),
+          eq(scheduledEvents.isCompleted, false),
+          gte(scheduledEvents.scheduledDate, todayDate),
+        ))
+        .orderBy(scheduledEvents.scheduledDate)
+        .limit(1);
+
+      let targetDayId: string | null = nextScheduled[0]?.trainingDayId ?? null;
+
+      // 2. Fallback: same trainingDay (same id) if no future schedule — keeps the cycle
+      if (!targetDayId) targetDayId = workoutSession.trainingDayId;
+
+      // Skip if a suggestion is already pending (don't overwrite manual or earlier auto)
+      const targetDay = await db.query.trainingDays.findFirst({
+        where: eq(trainingDays.id, targetDayId),
+        columns: { id: true, pendingAiSuggestion: true },
+      });
+
+      if (targetDay && !targetDay.pendingAiSuggestion) {
+        const result = await generateSuggestionForDay(db, session.user.id, targetDayId, locale, { source: "auto" });
+        await logger.info("progression:auto_trigger:complete", {
+          userId: session.user.id,
+          metadata: { sessionId, targetDayId, ok: result.ok, error: result.ok ? null : result.error },
+        });
+      } else {
+        await logger.info("progression:auto_trigger:skipped", {
+          userId: session.user.id,
+          metadata: { sessionId, targetDayId, reason: targetDay ? "already_pending" : "day_missing" },
+        });
+      }
+    }
+  } catch (err) {
+    await logger.warn("progression:auto_trigger:failed", {
       userId: session.user.id,
       metadata: { sessionId, error: String(err) },
     });

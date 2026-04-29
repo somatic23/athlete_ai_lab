@@ -145,7 +145,7 @@ export async function POST(_req: NextRequest, { params }: Params) {
     let best1rm: number | null = null;
     for (const s of doneSets) {
       if (s.weightKg && s.repsCompleted) {
-        const e = estimated1rm(s.weightKg, s.repsCompleted);
+        const e = estimated1rm(s.weightKg, s.repsCompleted, s.rpe);
         if (best1rm == null || e > best1rm) best1rm = e;
       }
     }
@@ -161,7 +161,7 @@ export async function POST(_req: NextRequest, { params }: Params) {
         let hEst1rm: number | null = null;
         for (const r of completedRows) {
           if (r.weightKg && r.repsCompleted) {
-            const e = estimated1rm(r.weightKg, r.repsCompleted);
+            const e = estimated1rm(r.weightKg, r.repsCompleted, r.rpe);
             if (hEst1rm == null || e > hEst1rm) hEst1rm = e;
           }
         }

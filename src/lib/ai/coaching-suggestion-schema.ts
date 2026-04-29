@@ -18,9 +18,10 @@ export const coachingSuggestionAiSchema = z.object({
   rationale: z.string(),
 });
 
-// Stored/returned schema (includes generatedAt)
+// Stored/returned schema (includes generatedAt + optional source for auto-trigger badge)
 export const coachingSuggestionSchema = coachingSuggestionAiSchema.extend({
   generatedAt: z.string(),
+  source: z.enum(["manual", "auto"]).optional(),
 });
 
 // Lenient fallback (all optional with defaults for generateText parse)
@@ -38,7 +39,30 @@ export const lenientSuggestionSchema = z.object({
   })).min(1),
   rationale: z.string().optional().default(""),
   generatedAt: z.string().optional().default(""),
+  source: z.enum(["manual", "auto"]).optional(),
 });
 
 export type CoachingSuggestion = z.infer<typeof coachingSuggestionSchema>;
 export type SuggestionExercise = z.infer<typeof suggestionExerciseSchema>;
+
+// AI-only schema — LLM provides natural-language justification per exercise + overall rationale.
+// Numbers (sets/reps/weight/changeType) come from the deterministic progression engine.
+export const aiReasonsSchema = z.object({
+  exercises: z.array(z.object({
+    exerciseId: z.string(),
+    changeReason: z.string(),
+    notes: z.string().optional().default(""),
+  })).min(1),
+  rationale: z.string(),
+});
+
+export const lenientAiReasonsSchema = z.object({
+  exercises: z.array(z.object({
+    exerciseId: z.string(),
+    changeReason: z.string().optional().default(""),
+    notes: z.string().optional().default(""),
+  })).optional().default([]),
+  rationale: z.string().optional().default(""),
+});
+
+export type AiReasons = z.infer<typeof aiReasonsSchema>;

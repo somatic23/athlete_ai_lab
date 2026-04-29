@@ -9,6 +9,22 @@ export type CurrentExercise = {
   notes: string | null;
 };
 
+export type EngineDecisionForPrompt = {
+  exerciseId: string;
+  exerciseName: string;
+  changeType: "progression" | "deload" | "maintenance" | "recovery";
+  fromSets: number;
+  fromRepsMin: number;
+  fromRepsMax: number | null;
+  fromWeightKg: number | null;
+  toSets: number;
+  toRepsMin: number;
+  toRepsMax: number | null;
+  toWeightKg: number | null;
+  reasonKey: string;
+  reasonInputs: Record<string, string | number>;
+};
+
 export type RecentPerformance = {
   exerciseId: string;
   sessionDate: string;
@@ -26,28 +42,26 @@ export type RecoveryStatus = {
 
 export function buildCoachingSuggestionSystemPrompt(locale: "de" | "en"): string {
   if (locale === "en") {
-    return `You are Atlas, an expert AI strength coach. Analyze the athlete's recent performance data and create concrete adjustments for their next training day.
+    return `You are Atlas, an expert AI strength coach. The training adjustments for the next session have ALREADY been calculated by a deterministic engine — your job is ONLY to write the natural-language justification in the coach's voice.
 
-Apply progressive overload principles:
-- Increase weight by 2.5–5 kg for compound movements (squat, deadlift, bench, row, press) when RPE ≤ 7 and all reps completed
-- Increase weight by 1.25–2.5 kg for isolation exercises under the same conditions
-- Suggest deload (reduce weight 10–20% or reduce sets) if RPE ≥ 9 or performance dropped
-- Suggest recovery (reduce volume, keep weight) if muscle group is not fully recovered
-- Use maintenance if no data is available or performance is optimal
+Rules:
+- Do NOT propose new numbers. Use exactly the sets/reps/weights given.
+- For each exercise, write a 1-2 sentence \`changeReason\` that references the actual reason (RPE, plateau, recovery, etc.).
+- Optionally add a brief \`notes\` line if the athlete should pay attention to something (form cue, tempo, etc.). Empty string is fine.
+- Write a short overall \`rationale\` (2-3 sentences) summarising the day.
 
-Respond ONLY with a valid JSON object matching the exact schema below. No prose, no markdown, no code fences.`;
+Respond ONLY with a valid JSON object matching the schema. No prose, no markdown, no code fences.`;
   }
 
-  return `Du bist Atlas, ein erfahrener KI-Krafttrainer. Analysiere die letzten Leistungsdaten des Athleten und erstelle konkrete Anpassungen für den nächsten Trainingstag.
+  return `Du bist Atlas, ein erfahrener KI-Krafttrainer. Die Trainingsanpassungen für die nächste Einheit wurden BEREITS von einer deterministischen Engine berechnet — deine Aufgabe ist NUR, die Begründung in der Coach-Stimme zu formulieren.
 
-Wende progressive Überlastungsprinzipien an:
-- Gewicht um 2,5–5 kg erhöhen bei Grundübungen (Kniebeuge, Kreuzheben, Bankdrücken, Rudern, Drücken) wenn RPE ≤ 7 und alle Wiederholungen geschafft
-- Gewicht um 1,25–2,5 kg erhöhen bei Isolationsübungen unter gleichen Bedingungen
-- Deload vorschlagen (Gewicht 10–20% reduzieren oder Sätze reduzieren) wenn RPE ≥ 9 oder Leistung gesunken
-- Recovery vorschlagen (Volumen reduzieren, Gewicht halten) wenn Muskelgruppe noch nicht vollständig erholt
-- Maintenance wenn keine Daten vorhanden oder Leistung optimal
+Regeln:
+- Schlage KEINE neuen Zahlen vor. Verwende exakt die gegebenen Sätze/Wiederholungen/Gewichte.
+- Für jede Übung 1–2 Sätze \`changeReason\`, der den tatsächlichen Auslöser (RPE, Plateau, Erholung, etc.) referenziert.
+- Optional eine kurze \`notes\`-Zeile, wenn der Athlet auf etwas achten sollte (Technik, Tempo). Leerer String ist okay.
+- Schreibe eine kurze \`rationale\` (2–3 Sätze) als Tageszusammenfassung.
 
-Antworte NUR mit einem gültigen JSON-Objekt gemäß dem exakten Schema unten. Kein Text, kein Markdown, keine Code-Blöcke.`;
+Antworte NUR mit einem gültigen JSON-Objekt gemäß Schema. Kein Text, kein Markdown, keine Code-Blöcke.`;
 }
 
 export function buildCoachingSuggestionUserPrompt(
@@ -142,6 +156,68 @@ ERHOLUNGSSTATUS
 ${recoveryLines || "  Keine Erholungsdaten verfügbar"}
 
 AUFGABE: Erstelle Anpassungen für jede Übung. Verwende NUR die oben aufgelisteten exerciseIds (keine neuen IDs erfinden). Verwende changeType="maintenance" wenn keine Änderung nötig. Gewichtsschritte: ±2,5–5 kg Grundübungen, ±1,25–2,5 kg Isolation.
+
+OUTPUT JSON SCHEMA (antworte mit genau dieser Struktur):
+${schemaExample}`;
+}
+
+/**
+ * Builds the user prompt for the LLM when the deterministic engine has already
+ * decided the numbers. The LLM only needs to produce per-exercise changeReason +
+ * optional notes + an overall rationale, in the coach's voice.
+ */
+export function buildReasoningUserPrompt(
+  dayTitle: string,
+  dayFocus: string | null,
+  decisions: EngineDecisionForPrompt[],
+  locale: "de" | "en",
+): string {
+  const fmt = (w: number | null) => w == null ? (locale === "en" ? "—" : "—") : `${w} kg`;
+  const reps = (mn: number, mx: number | null) => mx == null ? `${mn}` : `${mn}–${mx}`;
+
+  const lines = decisions.map((d) => {
+    const inputs = Object.entries(d.reasonInputs)
+      .map(([k, v]) => `${k}=${v}`)
+      .join(", ");
+    if (locale === "en") {
+      return `[exerciseId:${d.exerciseId}] ${d.exerciseName}
+  changeType: ${d.changeType}
+  reasonKey: ${d.reasonKey}${inputs ? ` (${inputs})` : ""}
+  from: ${d.fromSets} sets × ${reps(d.fromRepsMin, d.fromRepsMax)} reps, ${fmt(d.fromWeightKg)}
+  to:   ${d.toSets} sets × ${reps(d.toRepsMin, d.toRepsMax)} reps, ${fmt(d.toWeightKg)}`;
+    }
+    return `[exerciseId:${d.exerciseId}] ${d.exerciseName}
+  changeType: ${d.changeType}
+  reasonKey: ${d.reasonKey}${inputs ? ` (${inputs})` : ""}
+  von: ${d.fromSets} Sätze × ${reps(d.fromRepsMin, d.fromRepsMax)} Wdh, ${fmt(d.fromWeightKg)}
+  zu:  ${d.toSets} Sätze × ${reps(d.toRepsMin, d.toRepsMax)} Wdh, ${fmt(d.toWeightKg)}`;
+  }).join("\n\n");
+
+  const schemaExample = `{
+  "exercises": [
+    { "exerciseId": "...", "changeReason": "...", "notes": "" }
+  ],
+  "rationale": "..."
+}`;
+
+  if (locale === "en") {
+    return `TRAINING DAY: ${dayTitle}${dayFocus ? ` (Focus: ${dayFocus})` : ""}
+
+DECISIONS (already final — DO NOT change the numbers)
+${lines}
+
+TASK: For each exerciseId, write a 1-2 sentence \`changeReason\` that explains WHY this change happened in the coach's voice. Optionally add a brief \`notes\` (form cue, focus). Then write a 2-3 sentence overall \`rationale\` for the session.
+
+OUTPUT JSON SCHEMA (respond with this exact structure):
+${schemaExample}`;
+  }
+
+  return `TRAININGSTAG: ${dayTitle}${dayFocus ? ` (Fokus: ${dayFocus})` : ""}
+
+ENTSCHEIDUNGEN (final — Zahlen NICHT verändern)
+${lines}
+
+AUFGABE: Schreibe pro exerciseId einen \`changeReason\` (1–2 Sätze) der erklärt, WARUM die Anpassung passiert (Coach-Stimme). Optional eine kurze \`notes\`-Zeile (Technik, Fokus). Dann eine \`rationale\` (2–3 Sätze) für den Gesamttag.
 
 OUTPUT JSON SCHEMA (antworte mit genau dieser Struktur):
 ${schemaExample}`;

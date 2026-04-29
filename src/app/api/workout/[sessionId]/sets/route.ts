@@ -71,7 +71,7 @@ export async function POST(req: NextRequest, { params }: Params) {
   let isPR = false;
 
   if (weightKg && repsCompleted && outcome !== "skipped") {
-    e1rm = estimated1rm(weightKg, repsCompleted);
+    e1rm = estimated1rm(weightKg, repsCompleted, rpe);
 
     // Check for PR (estimated 1RM)
     const existingPR = await db.query.personalRecords.findFirst({
