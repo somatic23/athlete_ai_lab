@@ -125,6 +125,107 @@ describe("decide", () => {
     expect(d.suggestedWeightKg).toBe(100); // weight unchanged
   });
 
+  describe("volume landmarks (Rule 2.5)", () => {
+    const histGood = [{
+      sessionDate: "2026-04-27", maxWeightKg: 100, totalReps: 36, avgRpe: 7.2,
+      estimated1rm: 130, performanceDeltaPct: 0.5,
+    }];
+
+    it("forces a deload (drop set) when weekly sets exceed MRV", () => {
+      const d = decide(baseInputs({
+        history: histGood,
+        volume: { weekSetsForMuscle: 23, mev: 8, mav: 14, mrv: 22 },
+      }));
+      expect(d.changeType).toBe("deload");
+      expect(d.reasonKey).toBe("volume_above_mrv");
+      expect(d.sets).toBe(3); // 4 - 1
+      expect(d.suggestedWeightKg).toBe(100); // weight unchanged
+    });
+
+    it("never drops below 2 sets even from a small starting count", () => {
+      const d = decide(baseInputs({
+        current: { sets: 2, repsMin: 8, repsMax: 12, suggestedWeightKg: 100 },
+        history: histGood,
+        volume: { weekSetsForMuscle: 30, mev: 8, mav: 14, mrv: 22 },
+      }));
+      expect(d.sets).toBe(2);
+    });
+
+    it("adds a set when weekly sets are below MEV", () => {
+      const d = decide(baseInputs({
+        history: histGood,
+        volume: { weekSetsForMuscle: 6, mev: 8, mav: 14, mrv: 22 },
+      }));
+      expect(d.changeType).toBe("progression");
+      expect(d.reasonKey).toBe("volume_below_mev");
+      expect(d.sets).toBe(5); // 4 + 1
+    });
+
+    it("falls through to existing rules when sets are in MAV range", () => {
+      // RPE 6.5 + all reps would normally trigger rpe_low_full_reps progression
+      const d = decide(baseInputs({
+        history: [{
+          sessionDate: "2026-04-27", maxWeightKg: 100, totalReps: 48, avgRpe: 6.5,
+          estimated1rm: 130, performanceDeltaPct: 1,
+        }],
+        volume: { weekSetsForMuscle: 12, mev: 8, mav: 14, mrv: 22 },
+      }));
+      expect(d.reasonKey).toBe("rpe_low_full_reps");
+      expect(d.suggestedWeightKg).toBe(105);
+    });
+
+    it("disabled landmarks (mav=mrv=0) act as no-op even at high set counts", () => {
+      const d = decide(baseInputs({
+        history: histGood,
+        volume: { weekSetsForMuscle: 50, mev: 0, mav: 0, mrv: 0 },
+      }));
+      expect(d.reasonKey).not.toBe("volume_above_mrv");
+    });
+
+    it("RPE 9 deload (Rule 2) overrides volume_above_mrv (Rule 2.5)", () => {
+      // High RPE is concrete fatigue evidence — beats the volume threshold
+      const d = decide(baseInputs({
+        history: [{
+          sessionDate: "2026-04-27", maxWeightKg: 100, totalReps: 32, avgRpe: 9.5,
+          estimated1rm: 125, performanceDeltaPct: -1,
+        }],
+        volume: { weekSetsForMuscle: 30, mev: 8, mav: 14, mrv: 22 },
+      }));
+      expect(d.reasonKey).toBe("rpe_too_high");
+    });
+
+    it("recovery (Rule 1) overrides volume_above_mrv", () => {
+      const future = "2026-04-29T08:00:00.000Z";
+      const d = decide(baseInputs({
+        recovery: { fullyRecoveredAt: future },
+        history: histGood,
+        volume: { weekSetsForMuscle: 30, mev: 8, mav: 14, mrv: 22 },
+      }));
+      expect(d.changeType).toBe("recovery");
+      expect(d.reasonKey).toBe("muscle_unrecovered");
+    });
+
+    it("volume_below_mev overrides plateau_3_weeks (root cause: undertraining, not stagnation)", () => {
+      const d = decide(baseInputs({
+        history: histGood,
+        trend: { direction: "plateau", weeksInTrend: 4 },
+        volume: { weekSetsForMuscle: 5, mev: 8, mav: 14, mrv: 22 },
+      }));
+      expect(d.reasonKey).toBe("volume_below_mev");
+    });
+
+    it("renders volume_above_mrv reason with set count and MRV in German", () => {
+      const text = renderReason(
+        "volume_above_mrv",
+        { weekSets: 23, mrv: 22, muscleGroup: "chest" },
+        "de",
+      );
+      expect(text).toContain("23");
+      expect(text).toContain("22");
+      expect(text).toContain("chest");
+    });
+  });
+
   it("returns maintenance when no history exists", () => {
     const d = decide(baseInputs());
     expect(d.changeType).toBe("maintenance");

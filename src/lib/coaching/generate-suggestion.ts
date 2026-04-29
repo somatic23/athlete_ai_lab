@@ -15,7 +15,9 @@ import {
 } from "@/lib/ai/coaching-suggestion-prompts";
 import { aiReasonsSchema, lenientAiReasonsSchema, type CoachingSuggestion } from "@/lib/ai/coaching-suggestion-schema";
 import { decide, isCompoundExercise, renderReason, type ProgressionInputs } from "@/lib/coaching/progression-engine";
-import { getLatestTrend } from "@/lib/coaching/snapshots";
+import { getLatestTrend, weekStartOf } from "@/lib/coaching/snapshots";
+import { getLandmarksForUser, type MuscleGroup } from "@/lib/coaching/landmarks";
+import { computeWeeklyVolumeFor } from "@/lib/coaching/volume";
 
 export type GenerateOptions = {
   /** When true, the resulting suggestion is tagged as auto-generated (post-workout trigger). */
@@ -107,6 +109,18 @@ export async function generateSuggestionForDay(
     if (!latestByMuscle.has(row.muscleGroup)) latestByMuscle.set(row.muscleGroup, row);
   }
 
+  // ── Volume landmarks (MEV/MAV/MRV) and current weekly set count ────
+  // Loaded once for all primary muscle groups on this day so each exercise's
+  // decide() call can be Volume-aware without re-querying.
+  const distinctMuscleGroups = Array.from(new Set(
+    day.exercises.map((e) => (e.exercise?.primaryMuscleGroup ?? "full_body") as MuscleGroup),
+  ));
+  const currentWeekStart = weekStartOf(new Date().toISOString());
+  const [landmarksByMuscle, weeklyVolumeByMuscle] = await Promise.all([
+    getLandmarksForUser(database, userId, distinctMuscleGroups),
+    computeWeeklyVolumeFor(database, userId, currentWeekStart, distinctMuscleGroups),
+  ]);
+
   // ── Engine decisions per exercise ──────────────────────────────────
   const decisionsForPrompt: EngineDecisionForPrompt[] = [];
   const enginePerExercise = new Map<string, ReturnType<typeof decide>>();
@@ -117,6 +131,9 @@ export async function generateSuggestionForDay(
     const muscleGroup = planEx.exercise?.primaryMuscleGroup ?? "full_body";
     const recovery = latestByMuscle.get(muscleGroup);
     const trend = await getLatestTrend(database, userId, planEx.exerciseId);
+
+    const landmarks = landmarksByMuscle.get(muscleGroup as MuscleGroup);
+    const weekSetsForMuscle = weeklyVolumeByMuscle.get(muscleGroup as MuscleGroup) ?? 0;
 
     const inputs: ProgressionInputs = {
       exercise: {
@@ -140,6 +157,12 @@ export async function generateSuggestionForDay(
       })),
       recovery: { fullyRecoveredAt: recovery?.fullyRecoveredAt ?? null },
       trend: { direction: trend.direction, weeksInTrend: trend.weeksInTrend },
+      volume: landmarks ? {
+        weekSetsForMuscle,
+        mev: landmarks.mev,
+        mav: landmarks.mav,
+        mrv: landmarks.mrv,
+      } : undefined,
     };
 
     const decision = decide(inputs);

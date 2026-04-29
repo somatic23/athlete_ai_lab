@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import type { CoachingSuggestion } from "@/lib/ai/coaching-suggestion-schema";
+import type { WeeklyVolumeEntry, WeeklyVolumeResponse } from "@/app/api/coaching/weekly-volume/route";
 import { ExerciseAlternativesModal, type ExerciseAlternative } from "@/components/exercise-alternatives-modal";
 import { useParams, useRouter } from "next/navigation";
 import {
@@ -562,12 +563,65 @@ function SuggestionCard({ dayId, planId, currentExercises, suggestion, onAccepte
   );
 }
 
+// ── Volume bar (MEV/MAV/MRV indicator per muscle group) ───────────────
+
+const VOLUME_FILL_COLOR: Record<WeeklyVolumeEntry["status"], string> = {
+  below_mev: "bg-on-surface-variant/40",
+  in_mav: "bg-secondary",
+  above_mav: "bg-tertiary",
+  above_mrv: "bg-error",
+  disabled: "bg-on-surface-variant/20",
+};
+
+const VOLUME_STATUS_LABEL: Record<WeeklyVolumeEntry["status"], string> = {
+  below_mev: "unter MEV",
+  in_mav: "im Zielbereich",
+  above_mav: "über MAV",
+  above_mrv: "über MRV",
+  disabled: "—",
+};
+
+function MuscleVolumeBar({ entry }: { entry: WeeklyVolumeEntry }) {
+  if (entry.status === "disabled") return null;
+  // Visual scale: pin the right edge slightly past MRV so the MRV marker stays inside.
+  const scaleMax = Math.max(entry.mrv, entry.weekSets) * 1.1 || 1;
+  const pct = (n: number) => `${Math.min(100, (n / scaleMax) * 100)}%`;
+  const label = MUSCLE_LABELS[entry.muscleGroup] ?? entry.muscleGroup;
+  return (
+    <div
+      className="flex items-center gap-2 text-xs"
+      title={`${label}: ${entry.weekSets} Sätze diese Woche · MEV ${entry.mev} · MAV ${entry.mav} · MRV ${entry.mrv} (${VOLUME_STATUS_LABEL[entry.status]})`}
+    >
+      <span className="w-20 font-mono text-on-surface-variant truncate">{label}</span>
+      <div className="relative flex-1 h-1.5 rounded-full bg-surface-container-highest overflow-hidden">
+        <div
+          className={cn("absolute inset-y-0 left-0 transition-all", VOLUME_FILL_COLOR[entry.status])}
+          style={{ width: pct(entry.weekSets) }}
+        />
+        {entry.mev > 0 && (
+          <div className="absolute inset-y-0 w-px bg-on-surface-variant/30" style={{ left: pct(entry.mev) }} />
+        )}
+        {entry.mav > 0 && (
+          <div className="absolute inset-y-0 w-px bg-on-surface-variant/50" style={{ left: pct(entry.mav) }} />
+        )}
+        {entry.mrv > 0 && (
+          <div className="absolute inset-y-0 w-px bg-error/70" style={{ left: pct(entry.mrv) }} />
+        )}
+      </div>
+      <span className="w-14 text-right font-mono text-on-surface-variant/70 tabular-nums">
+        {entry.weekSets}/{entry.mav}
+      </span>
+    </div>
+  );
+}
+
 // ── Read-only day section ──────────────────────────────────────────────
 
-function DaySection({ day, planId, onPlanRefresh }: {
+function DaySection({ day, planId, onPlanRefresh, weeklyVolume }: {
   day: TrainingDay;
   planId: string;
   onPlanRefresh: () => void;
+  weeklyVolume: WeeklyVolumeResponse | null;
 }) {
   const [open, setOpen] = useState(true);
   const [suggesting, setSuggesting] = useState(false);
@@ -616,6 +670,22 @@ function DaySection({ day, planId, onPlanRefresh }: {
       </div>
       {open && (
         <div className="px-5 pb-4">
+          {(() => {
+            const dayMuscles = new Set(day.exercises.map((e) => e.exercise.primaryMuscleGroup));
+            const bars = (weeklyVolume?.groups ?? []).filter(
+              (g) => dayMuscles.has(g.muscleGroup) && g.status !== "disabled",
+            );
+            if (bars.length === 0) return null;
+            return (
+              <div className="mb-3 flex flex-col gap-1.5 rounded-lg bg-surface-container-high/50 px-3 py-2">
+                <div className="flex items-center justify-between text-xs font-mono text-on-surface-variant/50">
+                  <span>Wochen-Volumen</span>
+                  <span className="text-on-surface-variant/30">Sätze · MEV ▏ MAV ▏ MRV</span>
+                </div>
+                {bars.map((g) => <MuscleVolumeBar key={g.muscleGroup} entry={g} />)}
+              </div>
+            );
+          })()}
           {day.exercises.length === 0 ? (
             <p className="text-sm text-on-surface-variant py-2">Keine Übungen</p>
           ) : (
@@ -685,6 +755,10 @@ export default function PlanDetailPage() {
   // Status updating
   const [statusUpdating, setStatusUpdating] = useState(false);
 
+  // Weekly volume (MEV/MAV/MRV) loaded once per page mount; refreshed after a
+  // suggestion is accepted, since accepting changes the plan but not history.
+  const [weeklyVolume, setWeeklyVolume] = useState<WeeklyVolumeResponse | null>(null);
+
   const refreshPlan = useCallback(() => {
     fetch(`/api/plans/${planId}`)
       .then(async (r) => { if (!r.ok) throw new Error("Plan nicht gefunden"); return r.json(); })
@@ -693,7 +767,14 @@ export default function PlanDetailPage() {
       .finally(() => setLoading(false));
   }, [planId]);
 
-  useEffect(() => { refreshPlan(); }, [refreshPlan]);
+  const refreshVolume = useCallback(() => {
+    fetch("/api/coaching/weekly-volume")
+      .then((r) => r.ok ? r.json() : null)
+      .then((data: WeeklyVolumeResponse | null) => setWeeklyVolume(data))
+      .catch(() => setWeeklyVolume(null));
+  }, []);
+
+  useEffect(() => { refreshPlan(); refreshVolume(); }, [refreshPlan, refreshVolume]);
 
   function enterEditMode() {
     if (!plan) return;
@@ -915,7 +996,15 @@ export default function PlanDetailPage() {
               )}
             </>
           ) : (
-            plan.days.map((day) => <DaySection key={day.id} day={day} planId={planId} onPlanRefresh={refreshPlan} />)
+            plan.days.map((day) => (
+              <DaySection
+                key={day.id}
+                day={day}
+                planId={planId}
+                onPlanRefresh={refreshPlan}
+                weeklyVolume={weeklyVolume}
+              />
+            ))
           )}
         </div>
 

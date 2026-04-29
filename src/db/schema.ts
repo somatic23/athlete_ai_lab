@@ -425,6 +425,39 @@ export const progressionSnapshots = sqliteTable("progression_snapshots", {
     .$defaultFn(() => new Date().toISOString()),
 });
 
+export const muscleGroupLandmarks = sqliteTable("muscle_group_landmarks", {
+  id: text("id").primaryKey(),
+  userId: text("user_id")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  muscleGroup: text("muscle_group", {
+    enum: [
+      "chest",
+      "back",
+      "shoulders",
+      "biceps",
+      "triceps",
+      "forearms",
+      "quadriceps",
+      "hamstrings",
+      "glutes",
+      "calves",
+      "core",
+      "full_body",
+    ],
+  }).notNull(),
+  mv: integer("mv").notNull(),
+  mev: integer("mev").notNull(),
+  mav: integer("mav").notNull(),
+  mrv: integer("mrv").notNull(),
+  source: text("source", { enum: ["default", "manual", "adapted"] })
+    .notNull()
+    .default("default"),
+  updatedAt: text("updated_at")
+    .notNull()
+    .$defaultFn(() => new Date().toISOString()),
+});
+
 export const aiAnalysisReports = sqliteTable("ai_analysis_reports", {
   id: text("id").primaryKey(),
   sessionId: text("session_id").references(() => workoutSessions.id, {

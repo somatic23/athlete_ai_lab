@@ -25,6 +25,18 @@ export type ProgressionInputs = {
     direction: "up" | "plateau" | "down" | null;
     weeksInTrend: number | null;
   };
+  /**
+   * Optional weekly volume context for the primary muscle group. When present,
+   * the engine enforces volume landmarks (MEV/MAV/MRV) — drops sets if past
+   * MRV, adds a set if below MEV. When absent, the engine behaves exactly as
+   * before. `mav === 0 && mrv === 0` means "disabled" (e.g. full_body bucket).
+   */
+  volume?: {
+    weekSetsForMuscle: number;
+    mev: number;
+    mav: number;
+    mrv: number;
+  };
   /** Override "now" for deterministic tests. */
   nowIso?: string;
 };
@@ -46,6 +58,8 @@ export type ReasonKey =
   | "rpe_too_high"
   | "performance_dropped"
   | "trend_down"
+  | "volume_above_mrv"
+  | "volume_below_mev"
   | "plateau_3_weeks"
   | "rpe_low_full_reps"
   | "rep_progression"
@@ -166,6 +180,44 @@ export function decide(inputs: ProgressionInputs): ProgressionDecision {
     };
   }
 
+  // Rule 2.5: Volume landmarks (MEV/MAV/MRV).
+  // Sits BEFORE the plateau rule so a stagnation diagnosed as undertraining
+  // (below MEV) is corrected by adding volume rather than deloading further.
+  // Sits AFTER the RPE/perf-drop deloads because a real fatigue signal is a
+  // stronger argument than a weekly-set-count threshold.
+  if (inputs.volume) {
+    const { weekSetsForMuscle, mev, mav, mrv } = inputs.volume;
+    const isDisabled = mav === 0 && mrv === 0;
+    if (!isDisabled) {
+      if (weekSetsForMuscle > mrv) {
+        return {
+          changeType: "deload",
+          ...baseDecision,
+          sets: Math.max(2, current.sets - 1),
+          reasonKey: "volume_above_mrv",
+          reasonInputs: {
+            weekSets: weekSetsForMuscle,
+            mrv,
+            muscleGroup: exercise.primaryMuscleGroup,
+          },
+        };
+      }
+      if (weekSetsForMuscle < mev) {
+        return {
+          changeType: "progression",
+          ...baseDecision,
+          sets: current.sets + 1,
+          reasonKey: "volume_below_mev",
+          reasonInputs: {
+            weekSets: weekSetsForMuscle,
+            mev,
+            muscleGroup: exercise.primaryMuscleGroup,
+          },
+        };
+      }
+    }
+  }
+
   // Rule 3: Plateau-deload after 3 weeks
   if (trend.direction === "plateau" && (trend.weeksInTrend ?? 0) >= 3) {
     const newWeight = current.suggestedWeightKg
@@ -237,6 +289,8 @@ export const REASON_TEMPLATES_DE: Record<ReasonKey, string> = {
   rpe_too_high: "Letzter RPE bei {rpe} — Deload empfohlen, um Übertraining zu vermeiden.",
   performance_dropped: "Leistung um {deltaPct}% gesunken — kontrollierter Deload.",
   trend_down: "Trend zeigt seit {weeks} Wochen abwärts — Deload, um Erholung zu erzwingen.",
+  volume_above_mrv: "{muscleGroup} liegt diese Woche bei {weekSets} Sätzen — über MRV ({mrv}). Ein Satz weniger, um die Erholung zu sichern.",
+  volume_below_mev: "{muscleGroup} liegt diese Woche bei {weekSets} Sätzen — unter MEV ({mev}). Ein Satz mehr für ausreichenden Reiz.",
   plateau_3_weeks: "Seit {weeks} Wochen stagniert das e1RM — Deload-Woche bricht das Plateau.",
   rpe_low_full_reps: "Letzte Einheit mit RPE {rpe} und allen Wiederholungen — Gewicht +{step} kg.",
   rep_progression: "RPE {rpe} und Wiederholungen über Mindestbereich — eine Wiederholung mehr anpeilen.",
@@ -249,6 +303,8 @@ export const REASON_TEMPLATES_EN: Record<ReasonKey, string> = {
   rpe_too_high: "Last session RPE was {rpe} — deload recommended to prevent overreaching.",
   performance_dropped: "Performance dropped by {deltaPct}% — controlled deload.",
   trend_down: "Trend has been down for {weeks} weeks — deload to force recovery.",
+  volume_above_mrv: "{muscleGroup} is at {weekSets} sets this week — above MRV ({mrv}). Drop one set to protect recovery.",
+  volume_below_mev: "{muscleGroup} is at {weekSets} sets this week — below MEV ({mev}). Add one set for sufficient stimulus.",
   plateau_3_weeks: "e1RM has plateaued for {weeks} weeks — deload week breaks the plateau.",
   rpe_low_full_reps: "Last session RPE {rpe} with all reps — add {step} kg.",
   rep_progression: "RPE {rpe} and reps above the minimum — target one more rep.",
