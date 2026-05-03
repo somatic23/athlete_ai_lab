@@ -8,7 +8,11 @@ import { z } from "zod";
 import { estimated1rm } from "@/lib/utils/1rm";
 import { parseI18n } from "@/lib/utils/i18n";
 import { getDefaultModel } from "@/lib/ai/provider-registry";
-import { buildAnalysisSystemPrompt, buildAnalysisUserPrompt, type ExerciseAnalysisData, type ExerciseSessionHistory } from "@/lib/ai/system-prompts";
+import {
+  buildAnalysisSystemPrompt, buildAnalysisUserPrompt,
+  muscleGroupKeySchema, recoveryEstimatesSchema,
+  type ExerciseAnalysisData, type ExerciseSessionHistory, type MuscleGroupKey,
+} from "@/lib/ai/system-prompts";
 import { generateObject, generateText } from "ai";
 import { logger } from "@/lib/utils/logger";
 import { extractJsonObject } from "@/lib/utils/extract-json";
@@ -20,8 +24,8 @@ const analysisSchema = z.object({
   warnings: z.array(z.string()),
   recommendations: z.array(z.string()),
   plateauDetectedExercises: z.array(z.string()),
-  overloadDetectedMuscles: z.array(z.string()),
-  recoveryEstimates: z.record(z.string(), z.number()),
+  overloadDetectedMuscles: z.array(muscleGroupKeySchema),
+  recoveryEstimates: recoveryEstimatesSchema,
   nextSessionSuggestions: z.array(z.string()),
 });
 
@@ -254,7 +258,23 @@ export async function POST(_req: NextRequest, { params }: Params) {
             nextSessionSuggestions:   z.array(z.string()).optional().default([]),
           });
           const p = lenient.safeParse(jsonObj);
-          if (p.success) result = { object: p.data as Analysis };
+          if (p.success) {
+            // Filter unknown muscle group keys so downstream consumers can rely on the enum.
+            const filteredOverload = p.data.overloadDetectedMuscles.filter(
+              (m): m is MuscleGroupKey => muscleGroupKeySchema.safeParse(m).success,
+            );
+            const filteredRecovery: Record<string, number> = {};
+            for (const [k, v] of Object.entries(p.data.recoveryEstimates)) {
+              if (muscleGroupKeySchema.safeParse(k).success) filteredRecovery[k] = v;
+            }
+            result = {
+              object: {
+                ...p.data,
+                overloadDetectedMuscles: filteredOverload,
+                recoveryEstimates: filteredRecovery,
+              } as Analysis,
+            };
+          }
         }
       } catch (fallbackErr) {
         await logger.error("ai_analysis:manual:fallback_failed", {

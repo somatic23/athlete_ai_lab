@@ -13,6 +13,9 @@ import { getDefaultModel } from "@/lib/ai/provider-registry";
 import {
   buildPeriodAnalysisSystemPrompt,
   buildPeriodAnalysisUserPrompt,
+  muscleGroupKeySchema,
+  recoveryEstimatesSchema,
+  type MuscleGroupKey,
 } from "@/lib/ai/system-prompts";
 import { generateObject, generateText } from "ai";
 import { logger } from "@/lib/utils/logger";
@@ -28,8 +31,8 @@ const analysisSchema = z.object({
   warnings: z.array(z.string()),
   recommendations: z.array(z.string()),
   plateauDetectedExercises: z.array(z.string()),
-  overloadDetectedMuscles: z.array(z.string()),
-  recoveryEstimates: z.record(z.string(), z.number()),
+  overloadDetectedMuscles: z.array(muscleGroupKeySchema),
+  recoveryEstimates: recoveryEstimatesSchema,
   nextSessionSuggestions: z.array(z.string()),
 });
 
@@ -249,7 +252,20 @@ export async function POST(req: NextRequest) {
       if (jsonMatch) {
         const parsed = lenientAnalysisSchema.safeParse(jsonMatch);
         if (parsed.success) {
-          result = { object: parsed.data as Analysis };
+          const filteredOverload = parsed.data.overloadDetectedMuscles.filter(
+            (m): m is MuscleGroupKey => muscleGroupKeySchema.safeParse(m).success,
+          );
+          const filteredRecovery: Record<string, number> = {};
+          for (const [k, v] of Object.entries(parsed.data.recoveryEstimates)) {
+            if (muscleGroupKeySchema.safeParse(k).success) filteredRecovery[k] = v;
+          }
+          result = {
+            object: {
+              ...parsed.data,
+              overloadDetectedMuscles: filteredOverload,
+              recoveryEstimates: filteredRecovery,
+            } as Analysis,
+          };
         } else {
           await logger.warn(`ai_analysis:${type}:schema_mismatch`, {
             userId: session.user.id,

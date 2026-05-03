@@ -1,3 +1,4 @@
+import { z } from "zod";
 import type { equipment, exercises, users } from "@/db/schema";
 import { parseI18n } from "@/lib/utils/i18n";
 import { calculateAge } from "@/lib/utils/age";
@@ -7,6 +8,15 @@ import type { CoachPersonality } from "@/lib/coach-personalities";
 type UserProfile = typeof users.$inferSelect;
 type EquipmentRow = typeof equipment.$inferSelect;
 type ExerciseRow  = typeof exercises.$inferSelect;
+
+// ── Muscle group keys (shared across analysis prompts/schemas) ────────
+export const MUSCLE_GROUP_KEYS = [
+  "chest", "back", "shoulders", "biceps", "triceps", "forearms",
+  "quadriceps", "hamstrings", "glutes", "calves", "core", "full_body",
+] as const;
+export type MuscleGroupKey = (typeof MUSCLE_GROUP_KEYS)[number];
+export const muscleGroupKeySchema = z.enum(MUSCLE_GROUP_KEYS);
+export const recoveryEstimatesSchema = z.record(muscleGroupKeySchema, z.number());
 
 const EXPERIENCE_LABELS: Record<"de" | "en", Record<string, string>> = {
   de: {
@@ -307,6 +317,7 @@ export function buildAnalysisUserPrompt(
 ): string {
   const exerciseBlocks = exercises.map((e) => formatExerciseBlock(e, locale)).join("\n\n");
 
+  const muscleKeyHint = MUSCLE_GROUP_KEYS.join("|");
   const JSON_SCHEMA_EN = `
 Output ONLY the following JSON object — no explanation, no markdown, no preamble:
 {
@@ -314,10 +325,11 @@ Output ONLY the following JSON object — no explanation, no markdown, no preamb
   "warnings": ["concerns or risk factors"],
   "recommendations": ["concrete actionable suggestions"],
   "plateauDetectedExercises": ["exercise names where progress has stalled"],
-  "overloadDetectedMuscles": ["muscle groups showing overload signs"],
-  "recoveryEstimates": { "muscle_group": 48 },
+  "overloadDetectedMuscles": ["muscle group keys (use ONLY: ${muscleKeyHint})"],
+  "recoveryEstimates": { "chest": 48, "back": 36 },
   "nextSessionSuggestions": ["suggestions for the next workout"]
-}`;
+}
+NOTE: keys in "recoveryEstimates" and entries in "overloadDetectedMuscles" MUST be from this fixed set: ${muscleKeyHint}`;
 
   if (locale === "en") {
     return `WORKOUT: ${title}
@@ -340,6 +352,7 @@ ${JSON_SCHEMA_EN}`;
     very_heavy: "sehr schwer", maximal: "maximal",
   };
 
+  const muscleKeyHintDe = MUSCLE_GROUP_KEYS.join("|");
   const JSON_SCHEMA_DE = `
 Gib NUR das folgende JSON-Objekt aus — keine Erklärung, kein Markdown, keine Einleitung:
 {
@@ -347,10 +360,11 @@ Gib NUR das folgende JSON-Objekt aus — keine Erklärung, kein Markdown, keine 
   "warnings": ["Bedenken oder Risikofaktoren"],
   "recommendations": ["konkrete umsetzbare Empfehlungen"],
   "plateauDetectedExercises": ["Übungsnamen, bei denen der Fortschritt stagniert"],
-  "overloadDetectedMuscles": ["Muskelgruppen mit Überlastungsanzeichen"],
-  "recoveryEstimates": { "muskelgruppe": 48 },
+  "overloadDetectedMuscles": ["Muskelgruppen-Keys (NUR aus: ${muscleKeyHintDe})"],
+  "recoveryEstimates": { "chest": 48, "back": 36 },
   "nextSessionSuggestions": ["Vorschläge für das nächste Training"]
-}`;
+}
+HINWEIS: Keys in "recoveryEstimates" und Einträge in "overloadDetectedMuscles" MÜSSEN aus dieser festen Liste stammen: ${muscleKeyHintDe}`;
 
   return `TRAINING: ${title}
 Dauer: ${Math.round(durationSeconds / 60)} min | Volumen: ${totalVolumeKg.toFixed(1)} kg | Sätze: ${totalSets} | Wdh: ${totalReps}
@@ -485,6 +499,143 @@ OUTPUT SCHEMA (alle Felder befüllen, keine nulls):
 }`;
 }
 
+// ── Training context (active plan + recent sessions + recovery) ───────
+
+export type RecentSessionSummary = {
+  date: string;            // yyyy-mm-dd
+  title: string;
+  durationMin: number;
+  totalVolumeKg: number;
+  muscleGroups: string[];  // raw keys
+  perceivedLoad: string | null;
+  satisfactionRating: number | null;
+};
+
+export type ActivePlanDaySummary = {
+  dayName: string;
+  focus: string | null;
+  hasPendingSuggestion: boolean;
+};
+
+export type ActivePlanSummary = {
+  title: string;
+  days: ActivePlanDaySummary[];
+};
+
+export type RecoveryStatusSummary = {
+  muscleGroup: string;     // raw key
+  fullyRecoveredAt: string;
+};
+
+export type TrainingContext = {
+  activePlan: ActivePlanSummary | null;
+  recentSessions: RecentSessionSummary[];
+  recovering: RecoveryStatusSummary[];
+};
+
+const TRAINING_CTX_LABELS: Record<Locale, {
+  header: string;
+  activePlan: string;
+  noPlan: string;
+  recentSessions: string;
+  noSessions: string;
+  recovery: string;
+  allRecovered: string;
+  pendingSuggestion: string;
+  durationUnit: string;
+  volumeUnit: string;
+  load: string;
+  satisfaction: string;
+  recoveringUntil: string;
+}> = {
+  de: {
+    header: "## Aktueller Trainingskontext",
+    activePlan: "AKTIVER PLAN",
+    noPlan: "Kein aktiver Plan",
+    recentSessions: "LETZTE EINHEITEN",
+    noSessions: "Keine kürzlichen Einheiten",
+    recovery: "ERHOLUNG",
+    allRecovered: "Alle Muskelgruppen erholt",
+    pendingSuggestion: "offener KI-Vorschlag",
+    durationUnit: "min",
+    volumeUnit: "kg",
+    load: "Belastung",
+    satisfaction: "Zufriedenheit",
+    recoveringUntil: "noch in Erholung bis",
+  },
+  en: {
+    header: "## Current Training Context",
+    activePlan: "ACTIVE PLAN",
+    noPlan: "No active plan",
+    recentSessions: "RECENT SESSIONS",
+    noSessions: "No recent sessions",
+    recovery: "RECOVERY",
+    allRecovered: "All muscle groups recovered",
+    pendingSuggestion: "pending AI suggestion",
+    durationUnit: "min",
+    volumeUnit: "kg",
+    load: "Load",
+    satisfaction: "Satisfaction",
+    recoveringUntil: "still recovering until",
+  },
+};
+
+const LOAD_LABELS: Record<Locale, Record<string, string>> = {
+  de: { light: "leicht", moderate: "moderat", heavy: "schwer", very_heavy: "sehr schwer", maximal: "maximal" },
+  en: { light: "light", moderate: "moderate", heavy: "heavy", very_heavy: "very heavy", maximal: "maximal" },
+};
+
+function buildTrainingContextSection(ctx: TrainingContext, locale: Locale): string {
+  const L = TRAINING_CTX_LABELS[locale];
+  const muscleLabels = locale === "de" ? MUSCLE_LABELS_DE : MUSCLE_LABELS_EN;
+  const lines: string[] = [];
+
+  lines.push(`\n${L.header}\n`);
+
+  // Active plan
+  lines.push(`${L.activePlan}:`);
+  if (ctx.activePlan) {
+    lines.push(`- ${ctx.activePlan.title}`);
+    for (const d of ctx.activePlan.days) {
+      const focus = d.focus ? ` (${d.focus})` : "";
+      const pending = d.hasPendingSuggestion ? ` — ${L.pendingSuggestion}` : "";
+      lines.push(`  • ${d.dayName}${focus}${pending}`);
+    }
+  } else {
+    lines.push(`- ${L.noPlan}`);
+  }
+
+  // Recent sessions
+  lines.push(`\n${L.recentSessions}:`);
+  if (ctx.recentSessions.length === 0) {
+    lines.push(`- ${L.noSessions}`);
+  } else {
+    for (const s of ctx.recentSessions) {
+      const muscles = s.muscleGroups.map((m) => muscleLabels[m] ?? m).join(", ");
+      const parts: string[] = [
+        `${s.durationMin} ${L.durationUnit}`,
+        `${s.totalVolumeKg.toFixed(0)} ${L.volumeUnit}`,
+      ];
+      if (s.perceivedLoad) parts.push(`${L.load}: ${LOAD_LABELS[locale][s.perceivedLoad] ?? s.perceivedLoad}`);
+      if (s.satisfactionRating != null) parts.push(`${L.satisfaction}: ${s.satisfactionRating}/5`);
+      lines.push(`- ${s.date} — ${s.title} (${parts.join(" | ")})${muscles ? ` → ${muscles}` : ""}`);
+    }
+  }
+
+  // Recovery
+  lines.push(`\n${L.recovery}:`);
+  if (ctx.recovering.length === 0) {
+    lines.push(`- ${L.allRecovered}`);
+  } else {
+    for (const r of ctx.recovering) {
+      const label = muscleLabels[r.muscleGroup] ?? r.muscleGroup;
+      lines.push(`- ${label}: ${L.recoveringUntil} ${r.fullyRecoveredAt.slice(0, 16).replace("T", " ")}`);
+    }
+  }
+
+  return lines.join("\n") + "\n";
+}
+
 // ── Coach system prompt ────────────────────────────────────────────────
 
 const COMPETENCIES: Record<Locale, string> = {
@@ -529,21 +680,33 @@ export function buildCoachSystemPrompt(
   userEquipment?: EquipmentRow[],
   allExercises?: ExerciseRow[],
   locale: Locale = "de",
-  personality?: CoachPersonality | null
+  personality?: CoachPersonality | null,
+  trainingContext?: TrainingContext | null,
 ): string {
   const p = getPersonality(personality ?? (user?.coachPersonality as CoachPersonality | undefined));
 
+  const profile = profileSection(user, userEquipment, locale);
 
+  const exerciseCatalog =
+    userEquipment && allExercises
+      ? buildExerciseCatalog(userEquipment, allExercises, locale)
+      : "";
+  const catalogSection = exerciseCatalog
+    ? `\n${CATALOG_HEADER[locale]}\n${exerciseCatalog}\n`
+    : "";
+
+  const ctxSection = trainingContext
+    ? buildTrainingContextSection(trainingContext, locale)
+    : "";
 
   return `${p.intro[locale]}
 
 ${COMPETENCIES[locale]}
 ${p.personalityBlock[locale]}
-
+${profile}${ctxSection}${catalogSection}
 ${COMM_RULES_BASE[locale]}
 ${p.commStyle[locale]}`;
 }
-// ${profileSection(user, userEquipment, locale)}${catalogSection}
 // ── Plan creation (interview + tool call) system prompt ────────────────
 
 const PLAN_CREATION_RULES: Record<Locale, string> = {
