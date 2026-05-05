@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, useMemo } from "react";
 import { useChat } from "@ai-sdk/react";
 import { isTextUIPart } from "ai";
 import { cn } from "@/lib/utils/cn";
@@ -225,13 +225,51 @@ export default function CoachPage() {
 
 // ── Sub-components ─────────────────────────────────────────────────
 
+const STARTER_POOL = [
+  "Erstelle mir einen Trainingsplan für Muskelaufbau",
+  "Wie optimiere ich meine Kniebeuge-Technik?",
+  "Was ist der Unterschied zwischen RPE und RIR?",
+  "Wie plane ich Deload-Wochen richtig?",
+  "Welche Übungen eignen sich für einen breiteren Rücken?",
+  "Wie viele Sätze pro Muskelgruppe pro Woche sind optimal?",
+  "Wie verbessere ich meine Bankdrück-Leistung?",
+  "Was sollte ich vor und nach dem Training essen?",
+  "Wie baue ich Kraft im Kreuzheben auf?",
+  "Welche Mobility-Routine empfiehlst du vor dem Beintraining?",
+  "Wie erkenne ich Übertraining frühzeitig?",
+  "Push/Pull/Legs oder Oberkörper/Unterkörper-Split?",
+  "Wie progressiv sollte ich pro Woche steigern?",
+  "Welche Rolle spielt Schlaf für den Muskelaufbau?",
+  "Wie viel Protein brauche ich pro Tag wirklich?",
+  "Wie kombiniere ich Krafttraining und Cardio sinnvoll?",
+  "Welche Aufwärm-Routine empfiehlst du vor schweren Sätzen?",
+  "Wie überwinde ich ein Plateau im Bankdrücken?",
+  "Was ist Periodisierung und brauche ich das?",
+  "Wie trainiere ich effektiv mit nur 3 Tagen pro Woche?",
+];
+
+const VISIBLE_STARTERS = 4;
+const ROTATION_INTERVAL_MS = 5000;
+
+function pickRandomStarters(pool: string[], count: number, exclude: string[] = []): string[] {
+  const available = pool.filter((s) => !exclude.includes(s));
+  const source = available.length >= count ? available : pool;
+  const shuffled = [...source].sort(() => Math.random() - 0.5);
+  return shuffled.slice(0, count);
+}
+
 function EmptyState({ coachName, onPrompt }: { coachName: string; onPrompt: (text: string) => void }) {
-  const STARTERS = [
-    "Erstelle mir einen Trainingsplan für Muskelaufbau",
-    "Wie optimiere ich meine Kniebeuge-Technik?",
-    "Was ist der Unterschied zwischen RPE und RIR?",
-    "Wie plane ich Deload-Wochen richtig?",
-  ];
+  const initialStarters = useMemo(() => pickRandomStarters(STARTER_POOL, VISIBLE_STARTERS), []);
+  const [starters, setStarters] = useState<string[]>(initialStarters);
+  const [fadeKey, setFadeKey] = useState(0);
+
+  useEffect(() => {
+    const id = setInterval(() => {
+      setStarters((prev) => pickRandomStarters(STARTER_POOL, VISIBLE_STARTERS, prev));
+      setFadeKey((k) => k + 1);
+    }, ROTATION_INTERVAL_MS);
+    return () => clearInterval(id);
+  }, []);
 
   return (
     <div className="mx-auto flex max-w-4xl flex-col items-center justify-center py-16 text-center">
@@ -250,8 +288,8 @@ function EmptyState({ coachName, onPrompt }: { coachName: string; onPrompt: (tex
       <p className="mt-2 text-sm text-on-surface-variant/70">
         Stell {coachName} eine Frage oder starte direkt mit einem der Vorschläge.
       </p>
-      <div className="mt-8 grid grid-cols-1 gap-2 sm:grid-cols-2">
-        {STARTERS.map((s) => (
+      <div key={fadeKey} className="starter-fade mt-8 grid grid-cols-1 gap-2 sm:grid-cols-2">
+        {starters.map((s) => (
           <button
             key={s}
             onClick={() => onPrompt(s)}
@@ -262,6 +300,15 @@ function EmptyState({ coachName, onPrompt }: { coachName: string; onPrompt: (tex
           </button>
         ))}
       </div>
+      <style jsx>{`
+        .starter-fade {
+          animation: starter-fade-in 400ms ease-out;
+        }
+        @keyframes starter-fade-in {
+          from { opacity: 0; transform: translateY(4px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
     </div>
   );
 }

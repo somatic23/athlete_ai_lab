@@ -45,7 +45,7 @@ export default auth((req: NextRequest & { auth?: { user?: { role?: string; onboa
 
   // Logged in + public page → redirect to app
   if (session?.user && isPublic) {
-    const target = session.user.onboardingCompleted ? "/coach" : "/onboarding";
+    const target = session.user.onboardingCompleted ? "/dashboard" : "/onboarding";
     return withSecurityHeaders(NextResponse.redirect(new URL(target, req.url)));
   }
 
@@ -64,7 +64,7 @@ export default auth((req: NextRequest & { auth?: { user?: { role?: string; onboa
 
   // Admin only paths
   if (isAdmin && session?.user?.role !== "admin") {
-    return withSecurityHeaders(NextResponse.redirect(new URL("/coach", req.url)));
+    return withSecurityHeaders(NextResponse.redirect(new URL("/dashboard", req.url)));
   }
 
   return withSecurityHeaders(NextResponse.next());
